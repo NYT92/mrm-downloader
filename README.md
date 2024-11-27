@@ -12,7 +12,9 @@ Download bulk images/videos from MRM. Nobody asks for it but here we go...
 
 - Install Tampermonkey or any extension that supports userscript.
 
-- Since we rely on GM_cookie & GM_xmlhttpRequest, Please click __Allow all__ in order to use the script properly.
+- Visit [Greasyfork](https://greasyfork.org/en/scripts/507784-mrm-downloader) and click on install or Install from the [GitHub](https://github.com/NYT92/mrm-downloader/raw/refs/heads/main/mrm.user.js) directly
+
+- When you install the script, it will tell you that "A userscript wants to access a cross-origin resource". Since the script relies on GM_cookie & GM_xmlhttpRequest, Click __Allow all__ to use the script properly.
 
   <img src="https://i.imgur.com/IYqesP0.png" style="width:50%"/>
 
