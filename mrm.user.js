@@ -21,7 +21,7 @@
 // @exclude      https://myreadingmanga.info/lang/*
 // @exclude      https://myreadingmanga.info/yaoi-manga/*
 // @exclude      https://myreadingmanga.info/manhwa/*
-// @supportURL   https://gist.github.com/NYT92/1247c6421ad95bfc2a0b10d912fb56f0
+// @supportURL   https://github.com/NYT92/mrm-downloader
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=myreadingmanga.info
 // @require      https://cdnjs.cloudflare.com/ajax/libs/jszip/3.7.1/jszip.min.js
 // @require      https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js
