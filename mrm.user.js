@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         MRM Downloader
 // @namespace    https://nyt92.eu.org
-// @version      2024-11-21
+// @version      2024-12-08
 // @description  Download video and bulk images from myreadingmanga manga/doujin page.
 // @author       nyt92
 // @match        https://myreadingmanga.info/*
