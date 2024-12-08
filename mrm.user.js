@@ -21,7 +21,14 @@
 // @exclude      https://myreadingmanga.info/lang/*
 // @exclude      https://myreadingmanga.info/yaoi-manga/*
 // @exclude      https://myreadingmanga.info/manhwa/*
-// @supportURL   https://github.com/NYT92/mrm-downloader
+// @connect      myreadingmanga.info
+// @connect      i1.myreadingmanga.info
+// @connect      i2.myreadingmanga.info
+// @connect      i3.myreadingmanga.info
+// @connect      i4.myreadingmanga.info
+// @connect      i5.myreadingmanga.info
+// @connect      i6.myreadingmanga.info
+// @supportURL   https://gist.github.com/NYT92/1247c6421ad95bfc2a0b10d912fb56f0
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=myreadingmanga.info
 // @require      https://cdnjs.cloudflare.com/ajax/libs/jszip/3.7.1/jszip.min.js
 // @require      https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js
@@ -112,9 +119,10 @@
                 'image/jpeg': 'jpg',
                 'image/png': 'png',
                 'image/gif': 'gif',
-                'image/webp': 'webp'
+                'image/webp': 'webp',
+                'image/jpg': 'jpg'
             };
-            return mimeToExt[mimeType] || 'jpg';
+            return mimeToExt[mimeType.toLowerCase()] || 'jpg';
         }
 
         function addImageToZip(src, index) {
@@ -128,11 +136,23 @@
                         try {
                             const arrayBuffer = response.response;
                             const byteArray = new Uint8Array(arrayBuffer);
-                            const blob = new Blob([byteArray], {type: response.responseHeaders.match(/Content-Type: (.*)/i)[1]});
+                            let mimeType = 'image/jpeg';
+                            try {
+                                const contentTypeMatch = response.responseHeaders.match(/Content-Type:\s*(\S+)/i);
+                                if (contentTypeMatch && contentTypeMatch[1]) {
+                                    mimeType = contentTypeMatch[1];
+                                }
+                            } catch (headerError) {
+                                console.warn(`Could not parse Content-Type header for ${src}:`, headerError);
+                            }
+
+                            const blob = new Blob([byteArray], {type: mimeType});
                             const ext = getExtensionFromMimeType(blob.type);
                             const fileName = `image_${index + 1}.${ext}`;
+
                             zip.file(fileName, blob, {binary: true});
                             console.log(`Added ${fileName} to ZIP (${blob.size} bytes, type: ${blob.type})`);
+
                             const progress = ((index + 1) / imageSources.length) * 100;
                             progressInner.style.width = `${progress}%`;
                             resolve();
@@ -148,6 +168,7 @@
                 });
             });
         }
+
 
         Promise.all(imageSources.map(addImageToZip))
             .then(() => {
