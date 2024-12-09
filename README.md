@@ -10,6 +10,8 @@ Download bulk images/videos from MRM. Nobody asks for it but here we go...
 
 ## Usage
 
+>> THIS SCRIPT ONLY WORKS IN FIREFOX BROWSER, I am trying to find the solution for Chrome browser don't worry...
+
 - Install Tampermonkey or any extension that supports userscript.
 
 - Visit [Greasyfork](https://greasyfork.org/en/scripts/507784-mrm-downloader) and click on install or Install from the [GitHub](https://github.com/NYT92/mrm-downloader/raw/refs/heads/main/mrm.user.js) directly
