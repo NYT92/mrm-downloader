@@ -97,11 +97,11 @@
   const checkIfVid = document.querySelectorAll(".entry-categories a");
 
   if (!checkIfVid) {
-    console.log("no media found!");
+      console.log("no media found!");
   } else if (document.querySelector("#MRM_video") !== null) {
-    document.body.appendChild(videoDlBtn);
-  } else {
-    document.body.appendChild(imageDlBtn);
+      document.body.appendChild(videoDlBtn);
+  } else if (document.querySelector(".img-myreadingmanga") !== null) {
+      document.body.appendChild(imageDlBtn);
   }
   document.body.appendChild(progressBar);
   document.body.appendChild(progressText);
