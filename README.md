@@ -28,7 +28,8 @@ You can use the script without saving the cookies to the localStorage.
 
 ### All Chromium browsers (Chrome, Edge, Opera)
 
-Due to these browser rules or limitations, you have to provide the browser cookies because we needed the Cloudflare cookies to work.
+Due to these browser rules or limitations, you have to provide the browser cookies because we needed the Cloudflare cookies to work. 
+> __Notice: You have to re-enter the cookies every time you see the Cloudflare DDOS page being loaded since it will always load it when the IP address has been switched or the cookies have already expired within 24 hours. We will warn you if your cookies is expired and detected that you actually downloaded the Cloudflare ddos page instead of the images.__
 
 + To get the cookies:
   - On the Myreadingmanga's website, open the console (Ctrl+Shift+I) or (F12) and then go to the Network tab and refresh the page
@@ -43,7 +44,6 @@ Due to these browser rules or limitations, you have to provide the browser cooki
   - Now click on the "Load 🍪" then paste the cookie you copied and save it
  
     ![image](https://github.com/user-attachments/assets/3d9e0e71-e7ce-4f8e-a920-0989a76d0f29)
-
 
 ## Support
 Leave a comment or create an issue if there is any problem or my discord @nyt92#1075. Please be nice and modify it whatever you want. Also since everything is logged, open the console (Ctrl+Shift+I) or (F12) then go to the console tab and screenshot it for me.
