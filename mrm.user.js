@@ -40,7 +40,6 @@
 // ==/UserScript==
 
 // THIS USERSCRIPT IS LICENSE UNDER THE GPLv3 License
-
 (function () {
   "use strict";
 
@@ -318,11 +317,10 @@
       },
       onload: function (response) {
         const blob = new Blob([response.response], { type: "video/mp4" });
-        if (blob.type.includes("text/html")) {
+        if (new Blob([response.response]).type.includes("text/html") || new Blob([response.response]).type === "") {
           alert(
             "The script have detected the Cloudflare is blocking the page. You need to re-enter the cookies info due to Cloudflare resetting the cookies or the cookies is expired. See https://github.com/NYT92/mrm-downloader/tree/main?tab=readme-ov-file#using-the-script for more information."
           );
-          reject(new Error("Invalid cookies"));
           window.location.reload();
         } else {
           const safeTitle = title.replace(/[^a-z0-9]/gi, "_").toLowerCase();
