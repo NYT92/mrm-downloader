@@ -97,11 +97,11 @@
   const checkIfVid = document.querySelectorAll(".entry-categories a");
 
   if (!checkIfVid) {
-      console.log("no media found!");
+    console.log("no media found!");
   } else if (document.querySelector("#MRM_video") !== null) {
-      document.body.appendChild(videoDlBtn);
+    document.body.appendChild(videoDlBtn);
   } else if (document.querySelector(".img-myreadingmanga") !== null) {
-      document.body.appendChild(imageDlBtn);
+    document.body.appendChild(imageDlBtn);
   }
   document.body.appendChild(progressBar);
   document.body.appendChild(progressText);
@@ -121,7 +121,7 @@
   const isChromium = navigator.userAgent.match(/(chrome|edg|safari|opr)/i);
   if (!savedCookies && isChromium) {
     alert(
-      "Please set cookies first before downloading images on Chromium browsers!"
+      "Please set cookies first before downloading images. See https://github.com/NYT92/mrm-downloader/tree/main?tab=readme-ov-file#using-the-script for more information."
     );
     imageDlBtn.style.display = "none";
     videoDlBtn.style.display = "none";
@@ -218,7 +218,7 @@
 
               if (blob.type.includes("text/html")) {
                 alert(
-                  "The HTML file indicates that you need to re-enter the cookies info due to Cloudflare resetting the cookies or the cookies is expired. Please re-enter the cookies info and try again."
+                  "The script have detected the Cloudflare is blocking the page. You need to re-enter the cookies info due to Cloudflare resetting the cookies or the cookies is expired. See https://github.com/NYT92/mrm-downloader/tree/main?tab=readme-ov-file#using-the-script for more information."
                 );
                 reject(new Error("Invalid cookies"));
                 window.location.reload();
@@ -312,6 +312,7 @@
           progressInner.style.width = percentComplete + "%";
           const downloadedMB = (progress.loaded / (1024 * 1024)).toFixed(2);
           const totalMB = (progress.total / (1024 * 1024)).toFixed(2);
+          console.log(`Downloaded: ${downloadedMB}MB / ${totalMB}MB`);
           progressText.textContent = `Downloaded: ${downloadedMB}MB / ${totalMB}MB`;
         }
       },
@@ -319,7 +320,7 @@
         const blob = new Blob([response.response], { type: "video/mp4" });
         if (blob.type.includes("text/html")) {
           alert(
-            "The HTML file indicates that you need to re-enter the cookies info due to Cloudflare resetting the cookies or the cookies is expired. Please re-enter the cookies info and try again."
+            "The script have detected the Cloudflare is blocking the page. You need to re-enter the cookies info due to Cloudflare resetting the cookies or the cookies is expired. See https://github.com/NYT92/mrm-downloader/tree/main?tab=readme-ov-file#using-the-script for more information."
           );
           reject(new Error("Invalid cookies"));
           window.location.reload();
