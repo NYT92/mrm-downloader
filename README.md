@@ -39,7 +39,7 @@ Due to these browser rules or limitations, you must provide the cookies because 
     
     ![image](https://github.com/user-attachments/assets/26976eb0-d9fd-4aff-93e6-b45f588720f1)  
     *ignore the incorrect text thing since I screenshot it in the wrong order but the method is still the same
-  - After that go ahead and copy the whole value (don't include the word `Cookie:`)
+  - After that go ahead and copy the whole value (``cf_clearance`` is a must & needed value also don't include the word `Cookie:`)
   - Now click on the "Load 🍪" then paste the cookie you copied and save it
  
     ![image](https://github.com/user-attachments/assets/3d9e0e71-e7ce-4f8e-a920-0989a76d0f29)
