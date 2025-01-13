@@ -22,15 +22,14 @@ Download bulk images/videos from MRM. Nobody asks for it but here we go...
 
 ## Using the script
 
-### Firefox browser
-
-You can use the script without saving the cookies to the localStorage.
-
-### All Chromium browsers (Chrome, Edge, Opera)
-
 Due to these browser rules or limitations, you must provide the cookies because we needed the Cloudflare cookies to work. 
-> __Notice: You must re-enter the cookies every time you see the Cloudflare DDOS page being loaded since it will always load it when the IP address has been switched or the cookies have already expired within 24 hours. We will warn you if your cookies are expired and detect that you actually downloaded the Cloudflare DDoS page instead of the images.__
+> __Notice: You must re-enter the cookies every time you see the Cloudflare DDOS page being loaded since it will always load it when the IP address has been switched or the cookies have already expired within 24 hours. We'll let you know if your cookies are expired and we can see that you actually downloaded the Cloudflare DDoS page instead of the images.__
 
++ Video Tutorial for beginner
+  - [Tutorial for Firefox user](https://nspl.nyt92.eu.org/player?file=https://files.catbox.moe/jbn3w6.mp4&title=How%20to%20download%20images/video%20from%20myreadingmanga%20using%20mrm-downloader%20script%20(Firefox))  
+
+  - [Tutorial for Chrome user](https://nspl.nyt92.eu.org/player?file=https://files.catbox.moe/zbgovw.mp4&title=How%20to%20download%20images/video%20from%20myreadingmanga%20using%20mrm-downloader%20script%20(Chrome))
+  
 + To get the cookies (My method):
   - On the Myreadingmanga's website, open the console (Ctrl+Shift+I) or (F12) and then go to the Network tab and refresh the page
     
@@ -40,7 +39,7 @@ Due to these browser rules or limitations, you must provide the cookies because 
     
     ![image](https://github.com/user-attachments/assets/26976eb0-d9fd-4aff-93e6-b45f588720f1)  
     *ignore the incorrect text thing since I screenshot it in the wrong order but the method is still the same
-  - After that go ahead and copy the whole value (don't include the word `Cookie:`)
+  - After that go ahead and copy the whole value (``cf_clearance`` is a must & needed value also don't include the word `Cookie:`)
   - Now click on the "Load 🍪" then paste the cookie you copied and save it
  
     ![image](https://github.com/user-attachments/assets/3d9e0e71-e7ce-4f8e-a920-0989a76d0f29)
@@ -48,7 +47,7 @@ Due to these browser rules or limitations, you must provide the cookies because 
 You can use any method to get the cookies but be sure to copy everything or else the script will warn you or just break the content when you downloaded.
 
 ## Support
-Leave a comment or create an issue if there is any problem or my discord @nyt92#1075. Please be nice and modify it whatever you want. Also since everything is logged, open the console (Ctrl+Shift+I) or (F12) then go to the console tab and screenshot it for me.
+If there is any problem, leave a comment, create an issue, or contact me via my Discord, @nyt92. Please be nice and modify it whatever you want. Also, since everything is logged, open the console (Ctrl+Shift+I) or (F12), then go to the console tab and screenshot it for me.
 
 ## License
 
