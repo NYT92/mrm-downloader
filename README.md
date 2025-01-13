@@ -55,4 +55,4 @@ The code is licensed under the GNU GPLv3. Read more [here](https://gist.github.c
 
 ## Legal
 
-This script has nothing to do with myreadingmanga.info and all of the mangas, doujin, and animation there. The script's purpose is to download those files for personal archival only, but if you have money, go ahead and support all of these artists.
+I am not affiliated with myreadingmanga.info admin or moderator there and I create and use the script to download those files for personal archival or for viewing offline purposes. **If you have money, go ahead and support all of these artists there so that they can produce good shit for all**.
