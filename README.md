@@ -46,6 +46,15 @@ Due to these browser rules or limitations, you must provide the cookies because 
 
 You can use any method to get the cookies but be sure to copy everything or else the script will warn you or just break the content when you downloaded.
 
+## Adblocker
+If you use any adblocker, myreadingmanga will not work and it is not our script that causes the problem. The problem is that the adblocker blocks the main important URL that accesses those resources. 
+To fix this for the uBlock origin user simply go to the `settings > my filter` and add those rules in and apply.
+
+``@@||myreadingmanga.info/wp-admin/admin-ajax.php``  
+
+![image](https://github.com/user-attachments/assets/70fc9cd1-0c7b-4674-a505-f8852a4d44b5)
+
+
 ## Support
 If there is any problem, leave a comment, create an issue, or contact me via my Discord, @nyt92. Please be nice and modify it whatever you want. Also, since everything is logged, open the console (Ctrl+Shift+I) or (F12), then go to the console tab and screenshot it for me.
 
