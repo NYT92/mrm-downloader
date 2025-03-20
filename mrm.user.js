@@ -1,11 +1,15 @@
 // ==UserScript==
 // @name         MRM Downloader
 // @namespace    https://nyt92.eu.org
-// @version      2025-1-27
+// @version      2025-3-20
 // @description  Download video and bulk images from myreadingmanga manga/doujin page.
 // @author       nyt92
 // @match        https://myreadingmanga.info/*
 // @exclude      https://myreadingmanga.info/about/
+// @exclude      https://myreadingmanga.info/whats-that-book/
+// @exclude      https://myreadingmanga.info/upload
+// @exclude      https://myreadingmanga.info/popular/*
+// @exclude      https://myreadingmanga.info/video/*
 // @exclude      https://myreadingmanga.info/cats/*
 // @exclude      https://myreadingmanga.info/pairing/*
 // @exclude      https://myreadingmanga.info/group/*
@@ -42,6 +46,63 @@
 (function () {
   ("use strict");
 
+  const excludedPaths = [
+    "/about/",
+    "/upload/",
+    "/whats-that-book/",
+    "/popular/",
+    "/video/",
+    "/cats/",
+    "/pairing/",
+    "/group/",
+    "/privacy-policy/",
+    "/dmca-notice/",
+    "/contact/",
+    "/terms-service/",
+    "/sitemap/",
+    "/my-bookmark/",
+    "/tag/",
+    "/genre/",
+    "/status/",
+    "/lang/",
+    "/yaoi-manga/",
+    "/manhwa/",
+  ];
+
+  const currentPath = window.location.pathname;
+  if (excludedPaths.some((path) => currentPath.startsWith(path))) {
+    return;
+  }
+
+  const wpadminbar = document.querySelector("#wpadminbar");
+  if (wpadminbar) {
+    wpadminbar.remove();
+    document.documentElement.setAttribute("style", "margin-top: 0px !important;");
+  }
+
+  const style = document.createElement("style");
+  style.textContent = `
+    .mrm-dl-btn {
+      background-color: #ffab23;
+      border-radius: 5px;
+      display: inline-block;
+      cursor: pointer;
+      color: black;
+      font-size: 16px;
+      font-weight: bold;
+      padding: 16px 32px;
+      text-decoration: none;
+    }
+    .mrm-dl-btn:hover {
+      background-color:rgb(196, 120, 24);
+    }
+    .mrm-dl-btn:active {
+      position: relative;
+      top: 1px;
+    }
+  `;
+  document.head.appendChild(style);
+
   function saveCookies() {
     const cookies = prompt("Please paste your cookies here:");
     if (cookies) {
@@ -52,6 +113,7 @@
   }
 
   const cookiesBtn = document.createElement("button");
+  cookiesBtn.setAttribute("class", "mrm-dl-btn");
   cookiesBtn.id = "saveCookiesBtn";
   cookiesBtn.textContent = "Load 🍪";
   cookiesBtn.style.cssText =
@@ -66,12 +128,14 @@
       ?.textContent.trim() || "Untitled";
 
   const imageDlBtn = document.createElement("button");
+  imageDlBtn.setAttribute("class", "mrm-dl-btn");
   imageDlBtn.id = "downloadImagesBtn";
   imageDlBtn.textContent = "Download Images (.zip)";
   imageDlBtn.style.cssText =
     "position: fixed; top: 10px; right: 10px; z-index: 9999;";
 
   const videoDlBtn = document.createElement("button");
+  videoDlBtn.setAttribute("class", "mrm-dl-btn");
   videoDlBtn.id = "downloadVideoBtn";
   videoDlBtn.textContent = "Download Video";
   videoDlBtn.style.cssText =
@@ -92,15 +156,45 @@
     "position: fixed; top: 145px; right: 10px; z-index: 9999; display: none;";
   progressText.textContent = "Preparing download...";
 
-  const checkIfVid = document.querySelectorAll(".entry-categories a");
+  const checkVidinTag = Array.from(
+    document.querySelectorAll(".entry-categories a")
+  ).map((tag) => tag.textContent.trim().toLowerCase());
 
-  if (!checkIfVid) {
-    console.log("no media found!");
-  } else if (document.querySelector("#MRM_video") !== null) {
-    document.body.appendChild(videoDlBtn);
-  } else if (document.querySelector(".img-myreadingmanga") !== null) {
-    document.body.appendChild(imageDlBtn);
+  const hasVideo = document.querySelector("#MRM_video") !== null;
+  const hasYouTube =
+    document.querySelector("iframe[src*='youtube.com']") !== null;
+  const isHomePage = document.querySelector(".content-archive") !== null;
+
+  const imageSelectors = [
+    ".img-myreadingmanga",
+    ".img-myreadingmanga img",
+    ".entry-content img",
+    ".separator img",
+    "img[decoding='async']",
+  ];
+
+  let hasImages = false;
+  for (const selector of imageSelectors) {
+    if (document.querySelectorAll(selector).length > 0) {
+      hasImages = true;
+      break;
+    }
   }
+  if (
+    excludedPaths.some((path) => currentPath.startsWith(path)) ||
+    hasYouTube ||
+    isHomePage
+  ) {
+    return;
+  }
+  if (checkVidinTag.includes("video") && hasVideo) {
+    document.body.appendChild(videoDlBtn);
+  } else if (!checkVidinTag.includes("video") && hasImages) {
+    document.body.appendChild(imageDlBtn);
+  } else {
+    return;
+  }
+
   document.body.appendChild(progressBar);
   document.body.appendChild(progressText);
 
@@ -131,25 +225,24 @@
     imageDlBtn.disabled = true;
     imageDlBtn.textContent = "Downloading...";
 
-    const images = document.querySelectorAll(".img-myreadingmanga");
+    const imageSelectors = [
+      ".img-myreadingmanga",
+      ".img-myreadingmanga img",
+      ".entry-content img",
+      ".separator img",
+      "img[decoding='async']",
+    ];
 
     let imageSources = [];
 
-    imageSources = Array.from(images)
-      .map((img) => img.dataset.src)
-      .filter(Boolean);
-
-    if (imageSources.length === 0) {
-      imageSources = Array.from(images)
-        .map((img) => img.src)
-        .filter(Boolean);
-    }
-
-    if (imageSources.length === 0) {
-      const nestedImages = document.querySelectorAll(".img-myreadingmanga img");
-      imageSources = Array.from(nestedImages)
-        .map((img) => img.src || img.dataset.src)
-        .filter(Boolean);
+    for (const selector of imageSelectors) {
+      const images = document.querySelectorAll(selector);
+      if (images.length > 0) {
+        imageSources = Array.from(images)
+          .map((img) => img.src || img.dataset.src)
+          .filter(Boolean);
+        break;
+      }
     }
 
     if (imageSources.length === 0) {
