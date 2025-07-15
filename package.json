@@ -1,0 +1,15 @@
+{
+  "name": "mrm-ext",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "web-ext": "^8.8.0"
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "manifest_version": 3,
+  "name": "MRM Downloader",
+  "version": "1.0.0",
+  "description": "Download video and bulk images from myreadingmanga manga/doujin page.",
+  "author": "nyt92",
+  "permissions": ["storage", "downloads", "scripting"],
+  "icons": {
+    "16": "./icons/icon16.png",
+    "32": "./icons/icon32.png",
+    "48": "./icons/icon48.png",
+    "128": "./icons/icon128.png"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "MRM Downloader"
+  },
+  "host_permissions": [
+    "https://myreadingmanga.info/*",
+    "https://i1.myreadingmanga.info/*",
+    "https://i2.myreadingmanga.info/*",
+    "https://i3.myreadingmanga.info/*",
+    "https://i4.myreadingmanga.info/*",
+    "https://i5.myreadingmanga.info/*",
+    "https://i6.myreadingmanga.info/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["https://myreadingmanga.info/*"],
+      "js": [
+        "./scripts/jszip.min.js",
+        "./scripts/FileSaver.min.js",
+        "content.js",
+        "./scripts/tailwindcss-3.4.16.js"
+      ]
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "./scripts/jszip.min.js",
+        "./scripts/FileSaver.min.js",
+        "./scripts/tailwindcss-3.4.16.js"
+      ],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}
