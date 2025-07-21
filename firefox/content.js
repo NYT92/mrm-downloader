@@ -110,7 +110,7 @@
     if (checkVidinTag.includes("video") && hasVideo) {
       return { type: "video", hasContent: true };
     } else if (!checkVidinTag.includes("video") && hasImages) {
-      return { type: "images", hasContent: true };
+      return { type: "images", hasContent: true, supportsPdf: true };
     } else {
       return { type: "none", reason: "no_content" };
     }
@@ -128,6 +128,7 @@
         page: getCurrentPage(),
         contentType: contentType.type,
         hasContent: contentType.hasContent || false,
+        supportsPdf: contentType.supportsPdf || false,
         reason: contentType.reason,
       });
     }

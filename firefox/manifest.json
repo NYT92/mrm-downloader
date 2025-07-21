@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "MRM Downloader",
-  "version": "1.0.2",
+  "version": "1.0.4",
   "description": "Download video and bulk images from myreadingmanga manga/doujin page.",
   "author": "nyt92",
   "permissions": ["storage", "downloads", "scripting"],
@@ -30,8 +30,9 @@
       "js": [
         "./scripts/jszip.min.js",
         "./scripts/FileSaver.min.js",
-        "content.js",
-        "./scripts/tailwindcss-3.4.16.js"
+        "./scripts/tailwindcss-3.4.16.js",
+        "./scripts/jspdf.umd.min.js",
+        "content.js"
       ]
     }
   ],
@@ -40,7 +41,8 @@
       "resources": [
         "./scripts/jszip.min.js",
         "./scripts/FileSaver.min.js",
-        "./scripts/tailwindcss-3.4.16.js"
+        "./scripts/tailwindcss-3.4.16.js",
+        "./scripts/jspdf.umd.min.js"
       ],
       "matches": ["<all_urls>"]
     }
