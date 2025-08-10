@@ -117,6 +117,81 @@
   }
 
   // Listen for messages from popup
+  function ensurePageFetchBridge() {
+    if (document.getElementById("mrm-page-fetch-bridge")) return;
+    const script = document.createElement("script");
+    script.id = "mrm-page-fetch-bridge";
+    script.textContent = `(() => {
+      if (window.__mrmPageFetchBridgeInstalled) return;
+      window.__mrmPageFetchBridgeInstalled = true;
+      window.addEventListener('message', async (e) => {
+        try {
+          const data = e.data;
+          if (!data || data.source !== 'mrm-extension' || data.type !== 'MRM_PAGE_FETCH_REQUEST') return;
+          const { requestId, url, options, wantBody, responseType } = data;
+          const opts = Object.assign({ credentials: 'include', cache: 'no-store', mode: 'cors' }, options || {});
+          const res = await fetch(url, opts);
+          // Only return lightweight info needed for testing; avoid large bodies
+          const headers = Array.from(res.headers.entries());
+          if (wantBody) {
+            let body;
+            if (responseType === 'text') {
+              body = await res.text();
+            } else if (responseType === 'json') {
+              body = await res.json();
+            } else {
+              const buffer = await res.arrayBuffer();
+              // Transfer the ArrayBuffer to avoid copying
+              window.postMessage({
+                source: 'mrm-page',
+                type: 'MRM_PAGE_FETCH_RESPONSE',
+                requestId,
+                ok: res.ok,
+                status: res.status,
+                statusText: res.statusText,
+                headers,
+                body: buffer,
+                responseType: 'arraybuffer'
+              }, '*', [buffer]);
+              return;
+            }
+            window.postMessage({
+              source: 'mrm-page',
+              type: 'MRM_PAGE_FETCH_RESPONSE',
+              requestId,
+              ok: res.ok,
+              status: res.status,
+              statusText: res.statusText,
+              headers,
+              body,
+              responseType: responseType || 'text'
+            }, '*');
+          } else {
+            window.postMessage({
+              source: 'mrm-page',
+              type: 'MRM_PAGE_FETCH_RESPONSE',
+              requestId,
+              ok: res.ok,
+              status: res.status,
+              statusText: res.statusText,
+              headers
+            }, '*');
+          }
+        } catch (err) {
+          window.postMessage({
+            source: 'mrm-page',
+            type: 'MRM_PAGE_FETCH_RESPONSE',
+            requestId: e.data && e.data.requestId,
+            ok: false,
+            error: err && err.message ? err.message : String(err)
+          }, '*');
+        }
+      }, false);
+    })();`;
+    document.documentElement.appendChild(script);
+    script.remove();
+  }
+
   browser.runtime.onMessage.addListener((message) => {
     if (message && message.type === "GET_MRM_DATA") {
       const contentType = determineContentType();
@@ -130,6 +205,55 @@
         hasContent: contentType.hasContent || false,
         supportsPdf: contentType.supportsPdf || false,
         reason: contentType.reason,
+      });
+    }
+
+    if (message && message.type === "PAGE_FETCH") {
+      // Proxy a fetch through the page context so first-party cookies and referrer apply
+      ensurePageFetchBridge();
+
+      const requestId = `mrm_${Date.now()}_${Math.random()
+        .toString(36)
+        .slice(2)}`;
+
+      return new Promise((resolve) => {
+        function handleMessage(event) {
+          const data = event.data;
+          if (
+            !data ||
+            data.source !== "mrm-page" ||
+            data.type !== "MRM_PAGE_FETCH_RESPONSE"
+          )
+            return;
+          if (data.requestId !== requestId) return;
+          window.removeEventListener("message", handleMessage, false);
+          resolve({
+            ok: !!data.ok,
+            status: data.status,
+            statusText: data.statusText,
+            headers: data.headers,
+            // include body and responseType when requested
+            body: data.body,
+            responseType: data.responseType,
+            error: data.error || null,
+          });
+        }
+
+        window.addEventListener("message", handleMessage, false);
+
+        window.postMessage(
+          {
+            source: "mrm-extension",
+            type: "MRM_PAGE_FETCH_REQUEST",
+            requestId,
+            url: message.url,
+            options: message.options || { method: "GET" },
+            // forward wantBody and responseType through to the page
+            wantBody: !!message.wantBody,
+            responseType: message.responseType || "arraybuffer",
+          },
+          "*"
+        );
       });
     }
   });

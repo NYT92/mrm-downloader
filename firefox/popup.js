@@ -1,9 +1,19 @@
 let currentDownload = null;
 let downloadHistory = [];
 let currentView = "main";
+let mrmSettings = {
+  useCookies: true,
+  retryCount: 3,
+  timeout: 30,
+  debugMode: false,
+  cookieSource: "auto", // "auto" or "custom"
+  cookies: [],
+  autoRetrievedCookies: []
+};
 
 document.addEventListener("DOMContentLoaded", async function () {
   await loadDownloadHistory();
+  await loadSettings();
   await checkPageContent();
   setupEventListeners();
   updateUI();
@@ -28,6 +38,227 @@ async function saveDownloadHistory() {
   } catch (error) {
     console.error("[MRM] Error saving download history:", error);
   }
+}
+
+async function loadSettings() {
+  try {
+    const result = await browser.storage.local.get(["mrmSettings"]);
+    if (result.mrmSettings) {
+      mrmSettings = { ...mrmSettings, ...result.mrmSettings };
+    }
+    if (mrmSettings.debugMode) {
+      console.log("[MRM] Settings loaded:", mrmSettings);
+    }
+  } catch (error) {
+    console.error("[MRM] Error loading settings:", error);
+  }
+}
+
+function getCookieHeaders() {
+  if (!mrmSettings.useCookies) {
+    return {};
+  }
+  
+  let cookiesToUse = [];
+  
+  if (mrmSettings.cookieSource === "auto" && mrmSettings.autoRetrievedCookies && mrmSettings.autoRetrievedCookies.length > 0) {
+    cookiesToUse = mrmSettings.autoRetrievedCookies;
+  } else if (mrmSettings.cookieSource === "custom" && mrmSettings.cookies && mrmSettings.cookies.length > 0) {
+    cookiesToUse = mrmSettings.cookies;
+  }
+  
+  if (cookiesToUse.length === 0) {
+    return {};
+  }
+  
+  const cookieString = cookiesToUse
+    .map(cookie => `${cookie.name}=${cookie.value}`)
+    .join("; ");
+  
+  if (mrmSettings.debugMode) {
+    console.log(`[MRM Debug] Using ${cookiesToUse.length} cookies (${mrmSettings.cookieSource}):`, cookieString);
+  }
+  
+  return {
+    "Cookie": cookieString
+  };
+}
+
+async function setCookiesInBrowser(url) {
+  if (!mrmSettings.useCookies) {
+    console.log(`[MRM Debug] Cookie usage disabled, skipping cookie setting`);
+    return;
+  }
+
+  let cookiesToUse = [];
+  
+  if (mrmSettings.cookieSource === "auto" && mrmSettings.autoRetrievedCookies && mrmSettings.autoRetrievedCookies.length > 0) {
+    cookiesToUse = mrmSettings.autoRetrievedCookies;
+  } else if (mrmSettings.cookieSource === "custom" && mrmSettings.cookies && mrmSettings.cookies.length > 0) {
+    cookiesToUse = mrmSettings.cookies;
+  }
+
+  if (cookiesToUse.length === 0) {
+    console.log(`[MRM Debug] No cookies to set`);
+    return;
+  }
+
+  const urlObj = new URL(url);
+  console.log(`[MRM Debug] Setting ${cookiesToUse.length} cookies for ${urlObj.origin}`);
+
+  for (const cookie of cookiesToUse) {
+    try {
+      // Try different domain configurations for better compatibility
+      const domains = [
+        cookie.domain, // Original domain
+        urlObj.hostname, // Exact hostname
+        `.${urlObj.hostname}`, // Domain with leading dot
+        `.${urlObj.hostname.split('.').slice(-2).join('.')}`, // Parent domain
+      ].filter(Boolean);
+
+      let cookieSet = false;
+      for (const domain of domains) {
+        try {
+          const cookieDetails = {
+            url: url,
+            name: cookie.name,
+            value: cookie.value,
+            domain: domain,
+            path: cookie.path || "/",
+            secure: cookie.secure || urlObj.protocol === 'https:',
+            httpOnly: cookie.httpOnly || false
+          };
+
+          // Add partition key if available
+          if (cookie.partitionKey) {
+            cookieDetails.partitionKey = cookie.partitionKey;
+          }
+
+          await browser.cookies.set(cookieDetails);
+          console.log(`[MRM Debug] Successfully set cookie: ${cookie.name} for domain: ${domain}`);
+          cookieSet = true;
+          break;
+        } catch (domainError) {
+          console.log(`[MRM Debug] Failed to set cookie ${cookie.name} for domain ${domain}:`, domainError.message);
+        }
+      }
+
+      if (!cookieSet) {
+        console.error(`[MRM Debug] Failed to set cookie ${cookie.name} for any domain`);
+      }
+    } catch (error) {
+      console.error(`[MRM Debug] Failed to set cookie ${cookie.name}:`, error);
+    }
+  }
+}
+
+async function fetchWithSettings(url, options = {}) {
+  await setCookiesInBrowser(url);
+
+  const tab = await getActiveTab();
+
+  const pageFetchOptions = {
+    method: (options && options.method) || 'GET',
+  };
+  if (options && options.headers && options.headers.Referer) {
+    pageFetchOptions.referrer = options.headers.Referer;
+  }
+
+  console.log(`[MRM Debug] (Page) Fetching ${url}`);
+
+  let lastError;
+  for (let attempt = 1; attempt <= mrmSettings.retryCount; attempt++) {
+    try {
+      console.log(`[MRM Debug] (Page) Fetch attempt ${attempt} for ${url}`);
+      const pageResponse = await browser.tabs.sendMessage(tab.id, {
+        type: 'PAGE_FETCH',
+        url,
+        options: pageFetchOptions,
+        wantBody: true,
+        responseType: 'arraybuffer'
+      });
+
+      if (!pageResponse) throw new Error('No response from page context');
+
+      if (!pageResponse.ok) {
+        const statusInfo = typeof pageResponse.status !== 'undefined' ? `${pageResponse.status} ${pageResponse.statusText || ''}` : (pageResponse.error || 'Request failed');
+        throw new Error(`HTTP error: ${statusInfo}`);
+      }
+
+      const headers = new Headers(pageResponse.headers || []);
+      const contentType = headers.get('content-type') || 'application/octet-stream';
+      const blob = new Blob([pageResponse.body], { type: contentType });
+
+      const responseLike = {
+        ok: true,
+        status: pageResponse.status,
+        statusText: pageResponse.statusText,
+        headers,
+        blob: async () => blob
+      };
+
+      return responseLike;
+    } catch (error) {
+      lastError = error;
+      console.error(`[MRM Debug] (Page) Fetch attempt ${attempt} failed for ${url}:`, error);
+      if (attempt < mrmSettings.retryCount) {
+        const waitTime = Math.pow(2, attempt - 1) * 1000;
+        console.log(`[MRM Debug] Waiting ${waitTime}ms before retry...`);
+        await new Promise((resolve) => setTimeout(resolve, waitTime));
+      }
+    }
+  }
+
+  console.log(`[MRM Debug] Falling back to extension-context fetch for ${url}`);
+
+  const defaultHeaders = {
+    "User-Agent": navigator.userAgent,
+    "Accept": "image/webp,image/avif,image/*,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.5",
+    "Accept-Encoding": "gzip, deflate, br",
+    "DNT": "1",
+    "Connection": "keep-alive",
+    "Sec-Fetch-Dest": "image",
+    "Sec-Fetch-Mode": "no-cors",
+    "Sec-Fetch-Site": "same-site",
+    "Pragma": "no-cache",
+    "Cache-Control": "no-cache"
+  };
+
+  const fallbackHeaders = {
+    ...defaultHeaders,
+    ...(options.headers || {})
+  };
+
+  const fallbackOptions = {
+    ...options,
+    headers: fallbackHeaders,
+    timeout: mrmSettings.timeout * 1000,
+    credentials: 'include',
+    mode: 'cors'
+  };
+
+  let lastFallbackError;
+  for (let attempt = 1; attempt <= mrmSettings.retryCount; attempt++) {
+    try {
+      console.log(`[MRM Debug] (Ext) Fetch attempt ${attempt} for ${url}`);
+      const res = await fetch(url, fallbackOptions);
+      if (!res.ok) {
+        console.error(`[MRM Debug] (Ext) Response status: ${res.status} ${res.statusText}`);
+      }
+      return res;
+    } catch (err) {
+      lastFallbackError = err;
+      console.error(`[MRM Debug] (Ext) Fetch attempt ${attempt} failed for ${url}:`, err);
+      if (attempt < mrmSettings.retryCount) {
+        const waitTime = Math.pow(2, attempt - 1) * 1000;
+        console.log(`[MRM Debug] Waiting ${waitTime}ms before retry...`);
+        await new Promise((resolve) => setTimeout(resolve, waitTime));
+      }
+    }
+  }
+
+  throw (lastError || lastFallbackError || new Error('Fetch failed'));
 }
 
 function addToHistory(download) {
@@ -79,6 +310,7 @@ async function checkPageContent() {
 
     const data = await getMRMData();
     const downloadImagesBtn = document.getElementById("downloadImagesBtn");
+    const downloadAllBtn = document.getElementById("downloadAllBtn");
     const downloadPdfBtn = document.getElementById("downloadPdfBtn");
     const downloadVideoBtn = document.getElementById("downloadVideoBtn");
 
@@ -93,7 +325,13 @@ async function checkPageContent() {
           case "video":
             downloadVideoBtn.style.display = "block";
             downloadImagesBtn.style.display = "none";
-            downloadPdfBtn.style.display = "none";
+            downloadPdfBtn.style.display = "none"; // PDF disabled
+            // Show All button if images also present
+            if (data.images && data.images.length > 0) {
+              downloadAllBtn.style.display = "block";
+            } else {
+              downloadAllBtn.style.display = "none";
+            }
             document.querySelector("h2").textContent =
               data.title || "Video Content";
             document.getElementById("statusText").textContent = "Ready";
@@ -103,19 +341,28 @@ async function checkPageContent() {
             downloadImagesBtn.style.display = "block";
             downloadImagesBtn.textContent = "Download Images (ZIP)";
 
-            // Show PDF button if images support PDF generation
-            if (data.supportsPdf && data.images && data.images.length > 0) {
+            // Enable PDF only when content is images-only
+            if (data.images && data.images.length > 0 && !data.video) {
               downloadPdfBtn.style.display = "block";
               const pdfImageCount = document.getElementById("pdfImageCount");
               if (pdfImageCount) {
                 pdfImageCount.textContent = data.images.length;
               }
+            } else {
+              downloadPdfBtn.style.display = "none";
             }
 
             // Update image count display
             const imageCount = document.getElementById("imageCount");
             if (imageCount && data.images) {
               imageCount.textContent = data.images.length;
+            }
+
+            // Show All button if video also present
+            if (data.video) {
+              downloadAllBtn.style.display = "block";
+            } else {
+              downloadAllBtn.style.display = "none";
             }
 
             document.querySelector("h2").textContent =
@@ -126,8 +373,9 @@ async function checkPageContent() {
           case "none":
           default:
             downloadImagesBtn.style.display = "none";
-            downloadPdfBtn.style.display = "none";
+            downloadPdfBtn.style.display = "none"; // PDF disabled
             downloadVideoBtn.style.display = "none";
+            downloadAllBtn.style.display = "none";
             document.querySelector("h2").textContent =
               data.title || "No content selected";
             if (data.reason === "excluded_page") {
@@ -147,27 +395,36 @@ async function checkPageContent() {
         if (hasImages) {
           downloadImagesBtn.style.display = "block";
           downloadImagesBtn.textContent = "Download Images (ZIP)";
-
-          // Show PDF button for images
-          downloadPdfBtn.style.display = "block";
-          const pdfImageCount = document.getElementById("pdfImageCount");
-          const imageCount = document.getElementById("imageCount");
-          if (pdfImageCount && data.images) {
-            pdfImageCount.textContent = data.images.length;
+          // Enable PDF only when images-only
+          if (!hasVideo) {
+            downloadPdfBtn.style.display = "block";
+            const pdfImageCount = document.getElementById("pdfImageCount");
+            if (pdfImageCount && data.images) {
+              pdfImageCount.textContent = data.images.length;
+            }
+          } else {
+            downloadPdfBtn.style.display = "none";
           }
+          const imageCount = document.getElementById("imageCount");
           if (imageCount && data.images) {
             imageCount.textContent = data.images.length;
           }
 
-          downloadVideoBtn.style.display = "none";
+          downloadVideoBtn.style.display = hasVideo ? "block" : "none";
+          // Show All button only if both exist
+          document.getElementById("downloadAllBtn").style.display = hasVideo
+            ? "block"
+            : "none";
         } else if (hasVideo) {
           downloadVideoBtn.style.display = "block";
           downloadImagesBtn.style.display = "none";
-          downloadPdfBtn.style.display = "none";
+          downloadPdfBtn.style.display = "none"; // PDF disabled
+          document.getElementById("downloadAllBtn").style.display = "none";
         } else {
           downloadImagesBtn.style.display = "none";
-          downloadPdfBtn.style.display = "none";
+          downloadPdfBtn.style.display = "none"; // PDF disabled
           downloadVideoBtn.style.display = "none";
+          document.getElementById("downloadAllBtn").style.display = "none";
         }
 
         // Update title and status
@@ -190,8 +447,9 @@ async function checkPageContent() {
       console.log("not mrm");
       // Hide all download buttons when not on MyReadingManga
       downloadImagesBtn.style.display = "none";
-      downloadPdfBtn.style.display = "none";
+      downloadPdfBtn.style.display = "none"; // PDF disabled
       downloadVideoBtn.style.display = "none";
+      downloadAllBtn.style.display = "none";
       document.querySelector("h2").textContent = "MRM Downloader";
       document.getElementById("statusText").textContent =
         "Navigate to MyReadingManga to download content";
@@ -216,6 +474,10 @@ function setupEventListeners() {
   document
     .getElementById("downloadVideoBtn")
     .addEventListener("click", handleDownloadClick);
+
+  document
+    .getElementById("downloadAllBtn")
+    .addEventListener("click", handleDownloadAllClick);
 
   document
     .getElementById("downloadBtn")
@@ -351,6 +613,7 @@ async function clearHistory() {
 function setDownloadButtonState(isDisabled, text) {
   const downloadImagesBtn = document.getElementById("downloadImagesBtn");
   const downloadBtn = document.getElementById("downloadBtn");
+  const downloadAllBtn = document.getElementById("downloadAllBtn");
 
   if (downloadImagesBtn) {
     downloadImagesBtn.disabled = isDisabled;
@@ -360,6 +623,13 @@ function setDownloadButtonState(isDisabled, text) {
   if (downloadBtn) {
     downloadBtn.disabled = isDisabled;
     if (text) downloadBtn.textContent = text;
+  }
+
+  if (downloadAllBtn) {
+    downloadAllBtn.disabled = isDisabled;
+    if (text && document.activeElement === downloadAllBtn) {
+      downloadAllBtn.querySelector("#allButtonText").textContent = text;
+    }
   }
 }
 
@@ -448,6 +718,37 @@ async function handleDownloadClick() {
   }
 }
 
+async function handleDownloadAllClick() {
+  try {
+    const data = await getMRMData();
+    if (!data) {
+      alert("No content found on this page.");
+      setDownloadButtonState(false);
+      return;
+    }
+
+    const hasImages = data.images && data.images.length > 0;
+    const hasVideo = !!data.video;
+
+    if (!hasImages && !hasVideo) {
+      alert("No downloadable content found.");
+      setDownloadButtonState(false);
+      return;
+    }
+
+    await downloadAllMedia({
+      images: hasImages ? data.images : [],
+      videoUrl: hasVideo ? data.video : null,
+      title: data.title,
+      page: data.page || "1",
+    });
+  } catch (error) {
+    console.error("[MRM] Download all error:", error);
+    alert("Download failed. Check console for details.");
+    setDownloadButtonState(false);
+  }
+}
+
 function handleDeleteClick() {
   if (currentDownload) {
     if (confirm("Are you sure you want to cancel this download?")) {
@@ -462,7 +763,7 @@ function handleDeleteClick() {
 }
 
 function handleSettingsClick() {
-  // Later
+  window.location.href = "settings.html";
 }
 
 function setProgress(percent, text) {
@@ -529,7 +830,15 @@ async function downloadImages(images, title, page = "1") {
       setProgress(percent, `Downloading image ${i + 1} of ${images.length}...`);
 
       try {
-        const response = await fetch(images[i]);
+        // Add referrer header for image requests
+        const response = await fetchWithSettings(images[i], {
+          headers: {
+            "Referer": tab.url
+          }
+        });
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
         const blob = await response.blob();
         const ext = blob.type.split("/")[1] || "jpg";
         zip.file(`image_${i + 1}.${ext}`, blob, { binary: true });
@@ -538,6 +847,9 @@ async function downloadImages(images, title, page = "1") {
         );
       } catch (e) {
         console.error("[MRM] Error downloading image", images[i], e);
+        if (mrmSettings.debugMode) {
+          console.error("[MRM Debug] Image download error details:", e);
+        }
       }
     }
 
@@ -598,7 +910,12 @@ async function downloadVideo(videoUrl, title) {
   setDownloadButtonState(true, "Downloading...");
 
   try {
-    const response = await fetch(videoUrl);
+    // Add referrer header for video requests
+    const response = await fetchWithSettings(videoUrl, {
+      headers: {
+        "Referer": tab.url
+      }
+    });
 
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
@@ -647,6 +964,103 @@ async function downloadVideo(videoUrl, title) {
   }
 }
 
+async function downloadAllMedia({ images, videoUrl, title, page = "1" }) {
+  const hasImages = images && images.length > 0;
+  const hasVideo = !!videoUrl;
+
+  if (!hasImages && !hasVideo) {
+    alert("No images or video to download.");
+    return;
+  }
+
+  const tab = await getActiveTab();
+  currentDownload = { type: "all", title, url: tab.url };
+  updateStatus("Downloading media...");
+  setDownloadButtonState(true, "Downloading...");
+  setProgress(0, "Preparing files...");
+
+  const zip = new JSZip();
+
+  try {
+    let progressBase = 0;
+    let progressSpan = hasImages && hasVideo ? 45 : 90;
+
+    // Images first
+    if (hasImages) {
+      for (let i = 0; i < images.length; i++) {
+        const percent = progressBase + ((i + 1) / images.length) * progressSpan;
+        setProgress(percent, `Downloading image ${i + 1} of ${images.length}...`);
+        try {
+          const response = await fetchWithSettings(images[i], {
+            headers: { Referer: tab.url },
+          });
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          const blob = await response.blob();
+          const mime = blob.type || "image/jpeg";
+          const subtype = mime.split("/")[1] || "jpg";
+          zip.file(`images/image_${i + 1}.${subtype}`, blob, { binary: true });
+        } catch (e) {
+          console.error("[MRM] Error downloading image", images[i], e);
+        }
+      }
+      progressBase += progressSpan;
+    }
+
+    // Then video
+    if (hasVideo) {
+      setProgress(progressBase + 5, "Fetching video...");
+      const response = await fetchWithSettings(videoUrl, {
+        headers: { Referer: tab.url },
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const blob = await response.blob();
+      const guessedExt = (() => {
+        const byMime = blob.type && blob.type.includes("/") ? blob.type.split("/")[1] : null;
+        const byUrl = videoUrl.split(".").pop();
+        const candidate = (byMime || byUrl || "mp4").split(/[?#]/)[0];
+        return candidate.length > 5 ? "mp4" : candidate;
+      })();
+      zip.file(`video/video.${guessedExt}`, blob, { binary: true });
+      setProgress(progressBase + 45, "Added video to ZIP...");
+    }
+
+    setProgress(95, "Creating ZIP file...");
+    const content = await zip.generateAsync({ type: "blob" });
+
+    const safeTitle = title.replace(/[^a-z0-9]/gi, "_").toLowerCase();
+    const filename = `${safeTitle}_p${page}_all.zip`;
+    saveAs(content, filename);
+
+    setProgress(100, "Saved ZIP file");
+
+    addToHistory({
+      title: `${title} - Page ${page}`,
+      url: tab.url,
+      type: "all",
+      status: "completed",
+      progress: 100,
+    });
+
+    updateStatus("Download completed");
+    currentDownload = null;
+    setDownloadButtonState(false, "Download All (ZIP)");
+  } catch (error) {
+    console.error("[MRM] All media download error:", error);
+    updateStatus("Download failed");
+    setProgress(0, "Download failed");
+    addToHistory({
+      title,
+      url: tab.url,
+      type: "all",
+      status: "failed",
+      progress: 0,
+    });
+    currentDownload = null;
+    setDownloadButtonState(false, "Download All (ZIP)");
+    alert("All media download failed. Check console for details.");
+  }
+}
+
 async function downloadPdf(images, title, page = "1") {
   if (!images.length) {
     alert("No images found on this page.");
@@ -672,16 +1086,22 @@ async function downloadPdf(images, title, page = "1") {
       );
     }
 
-    const pdf = new jsPDF("p", "mm", "a4");
-
-    pdf.deletePage(1);
+    let pdf = null;
 
     for (let i = 0; i < images.length; i++) {
       const percent = ((i + 1) / images.length) * 90;
       setProgress(percent, `Processing image ${i + 1} of ${images.length}...`);
 
       try {
-        const response = await fetch(images[i]);
+        // Add referrer header for PDF image requests
+        const response = await fetchWithSettings(images[i], {
+          headers: {
+            "Referer": tab.url
+          }
+        });
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
         const blob = await response.blob();
 
         const base64 = await new Promise((resolve) => {
@@ -690,8 +1110,6 @@ async function downloadPdf(images, title, page = "1") {
           reader.readAsDataURL(blob);
         });
 
-        pdf.addPage();
-
         const img = new Image();
         img.src = base64;
 
@@ -699,33 +1117,29 @@ async function downloadPdf(images, title, page = "1") {
           img.onload = resolve;
         });
 
-        const pageWidth = 210;
-        const pageHeight = 297;
-        const margin = 2;
-        const maxWidth = pageWidth - 2 * margin;
-        const maxHeight = pageHeight - 2 * margin;
-
-        const imgRatio = img.width / img.height;
-        const pageRatio = maxWidth / maxHeight;
-
-        let finalWidth, finalHeight;
-
-        if (imgRatio > pageRatio) {
-          finalWidth = maxWidth;
-          finalHeight = maxWidth / imgRatio;
+        // Initialize PDF on first image with page size matching image resolution (no borders)
+        const orientation = img.width > img.height ? "l" : "p";
+        if (!pdf) {
+          pdf = new jsPDF(orientation, "px", [img.width, img.height]);
         } else {
-          finalHeight = maxHeight;
-          finalWidth = maxHeight * imgRatio;
+          pdf.addPage([img.width, img.height], orientation);
         }
 
-        const x = (pageWidth - finalWidth) / 2;
-        const y = (pageHeight - finalHeight) / 2;
+        // Choose image format based on mime (default to JPEG)
+        let imgFormat = "JPEG";
+        try {
+          const mime = (base64.split(",")[0] || "").toLowerCase();
+          if (mime.includes("png")) imgFormat = "PNG";
+        } catch (_) {}
 
-        pdf.addImage(base64, "JPEG", x, y, finalWidth, finalHeight);
+        pdf.addImage(base64, imgFormat, 0, 0, img.width, img.height);
 
         console.log(`[MRM] Added image ${i + 1}/${images.length} to PDF`);
       } catch (e) {
         console.error("[MRM] Error processing image for PDF", images[i], e);
+        if (mrmSettings.debugMode) {
+          console.error("[MRM Debug] PDF image processing error details:", e);
+        }
       }
     }
 
@@ -780,3 +1194,4 @@ function setPdfButtonState(isDisabled, text) {
     }
   }
 }
+

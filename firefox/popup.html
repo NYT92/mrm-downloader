@@ -50,8 +50,8 @@
         History
       </button>
       <button id="settingsBtn"
-        class="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50" disabled>
-        Settings (Later)
+        class="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50">
+        Settings
       </button>
     </div>
   </div>
@@ -84,6 +84,12 @@
           </svg>
           <span id="imagesButtonText">Download Images (ZIP)</span>
           <span id="imageCount" class="bg-white/20 text-xs px-2 py-1 rounded-full"></span>
+        </button>
+
+        <button id="downloadAllBtn"
+          class="download-button w-full bg-indigo-500 hover:bg-indigo-600 disabled:bg-gray-300 text-white py-3 px-4 rounded-lg flex items-center justify-center space-x-2"
+          style="display: none;">
+          <span id="allButtonText">Download All (ZIP)</span>
         </button>
 
         <button id="downloadPdfBtn"

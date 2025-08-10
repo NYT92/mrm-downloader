@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>MRM Downloader - Settings</title>
+  <script src="./scripts/tailwindcss-3.4.16.js"></script>
+  <style>
+    @tailwind base;
+    @tailwind components;
+    @tailwind utilities;
+
+    @import url('https://cdn-global.nyt92.eu.org/font/inter/inter.css');
+
+    body {
+      font-family: Inter, sans-serif;
+      width: 500px;
+      min-height: 400px;
+      margin: 0;
+      padding: 16px;
+      background-color: #f5f5f5;
+    }
+
+    .setting-item {
+      transition: all 0.2s ease;
+    }
+
+    .setting-item:hover {
+      background-color: #f8f9fa;
+    }
+
+    .cookie-item {
+      transition: all 0.2s ease;
+    }
+
+    .cookie-item:hover {
+      background-color: #f8f9fa;
+    }
+
+    .toggle-switch {
+      position: relative;
+      display: inline-block;
+      width: 48px;
+      height: 24px;
+    }
+
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #ccc;
+      transition: .4s;
+      border-radius: 24px;
+    }
+
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 18px;
+      width: 18px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: .4s;
+      border-radius: 50%;
+    }
+
+    input:checked + .slider {
+      background-color: #3B82F6;
+    }
+
+    input:checked + .slider:before {
+      transform: translateX(24px);
+    }
+  </style>
+</head>
+
+<body class="bg-gray-100">
+  <!-- Header -->
+  <div class="flex justify-between items-center mb-6">
+    <div class="flex items-center space-x-3">
+      <button id="backBtn" class="bg-white border border-gray-300 text-gray-700 p-2 rounded-lg hover:bg-gray-50">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+        </svg>
+      </button>
+      <h1 class="text-2xl font-bold text-orange-500">Settings</h1>
+    </div>
+    <button id="saveBtn" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg">
+      Save
+    </button>
+  </div>
+
+  <!-- Settings Content -->
+  <div class="space-y-4">
+    
+    <!-- Cookie Management Section -->
+    <div class="bg-white rounded-2xl p-6 border border-gray-200">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-lg font-semibold text-gray-800">Cookie Management</h3>
+        <div class="flex gap-2">
+          <button id="autoRetrieveCookiesBtn" class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded-lg text-sm">
+            Auto Retrieve
+          </button>
+          <button id="addCookieBtn" class="bg-green-500 hover:bg-green-600 text-white px-3 py-2 rounded-lg text-sm">
+            Add Cookie
+          </button>
+        </div>
+      </div>
+
+      <!-- Cookie Source Selection -->
+      <div class="mb-4">
+        <div class="flex items-center space-x-4 mb-3">
+          <label class="flex items-center">
+            <input type="radio" name="cookieSource" value="auto" id="cookieSourceAuto" class="mr-2">
+            <span class="text-sm font-medium">Auto-retrieve from current tab</span>
+          </label>
+          <label class="flex items-center">
+            <input type="radio" name="cookieSource" value="custom" id="cookieSourceCustom" class="mr-2">
+            <span class="text-sm font-medium">Custom cookies</span>
+          </label>
+        </div>
+        <p class="text-sm text-gray-600">
+          Auto-retrieve will get cookies (including cf_clearance) from the current tab. Custom allows manual input.
+        </p>
+      </div>
+
+      <!-- Simple Cookie String Input -->
+      <div id="simpleCookieInput" class="mb-4" style="display: none;">
+        <label class="block text-sm font-medium text-gray-700 mb-2">Cookie String</label>
+        <textarea id="cookieStringTextarea" 
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  rows="3"
+                  placeholder="Paste your cookies here (format: name1=value1; name2=value2; name3=value3)"></textarea>
+        <div class="flex justify-between items-center mt-2">
+          <p class="text-xs text-gray-500">Example: session_id=abc123; cf_clearance=def456</p>
+          <button id="parseCookieStringBtn" class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm">
+            Parse & Save
+          </button>
+        </div>
+      </div>
+
+      <!-- Auto-retrieved Cookies Display -->
+      <div id="autoRetrievedCookies" class="mb-4" style="display: none;">
+        <div class="flex justify-between items-center mb-2">
+          <h4 class="font-medium text-gray-800">Auto-retrieved Cookies</h4>
+          <button id="refreshCookiesBtn" class="bg-gray-500 hover:bg-gray-600 text-white px-3 py-1 rounded text-sm">
+            Refresh
+          </button>
+        </div>
+        <div id="autoRetrievedList" class="space-y-2 max-h-40 overflow-y-auto bg-gray-50 p-3 rounded">
+          <!-- Auto-retrieved cookies will appear here -->
+        </div>
+      </div>
+
+      <!-- Cookie List -->
+      <div id="cookieList" class="space-y-3 mb-4">
+        <!-- Cookies will be dynamically added here -->
+      </div>
+
+      <!-- Empty State -->
+      <div id="emptyCookies" class="text-center py-8 text-gray-500">
+        <svg class="w-12 h-12 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
+          </path>
+        </svg>
+        <p>No cookies configured</p>
+        <p class="text-xs text-gray-400 mt-1">Choose auto-retrieve or add custom cookies</p>
+      </div>
+    </div>
+
+    <!-- Download Settings Section -->
+    <div class="bg-white rounded-2xl p-6 border border-gray-200">
+      <h3 class="text-lg font-semibold text-gray-800 mb-4">Download Settings</h3>
+      
+      <!-- Use Cookies Toggle -->
+      <div class="setting-item flex justify-between items-center p-3 border border-gray-200 rounded-lg mb-3">
+        <div>
+          <h4 class="font-medium text-gray-800">Use Cookies for Downloads</h4>
+          <p class="text-sm text-gray-600">Send configured cookies with image download requests</p>
+        </div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="useCookiesToggle">
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <!-- Download Retry Settings -->
+      <div class="setting-item p-3 border border-gray-200 rounded-lg mb-3">
+        <div class="flex justify-between items-center mb-2">
+          <h4 class="font-medium text-gray-800">Download Retry Attempts</h4>
+          <span id="retryCountDisplay" class="text-sm text-gray-600">3</span>
+        </div>
+        <p class="text-sm text-gray-600 mb-3">Number of retry attempts for failed downloads</p>
+        <input type="range" id="retryCountSlider" min="1" max="10" value="3" 
+               class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+      </div>
+
+      <!-- Download Timeout Settings -->
+      <div class="setting-item p-3 border border-gray-200 rounded-lg">
+        <div class="flex justify-between items-center mb-2">
+          <h4 class="font-medium text-gray-800">Download Timeout (seconds)</h4>
+          <span id="timeoutDisplay" class="text-sm text-gray-600">30</span>
+        </div>
+        <p class="text-sm text-gray-600 mb-3">Timeout for individual image downloads</p>
+        <input type="range" id="timeoutSlider" min="10" max="120" value="30" 
+               class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+      </div>
+    </div>
+
+    <!-- Advanced Settings Section -->
+    <div class="bg-white rounded-2xl p-6 border border-gray-200">
+      <h3 class="text-lg font-semibold text-gray-800 mb-4">Advanced Settings</h3>
+      
+      <!-- Debug Mode Toggle -->
+      <div class="setting-item flex justify-between items-center p-3 border border-gray-200 rounded-lg mb-3">
+        <div>
+          <h4 class="font-medium text-gray-800">Debug Mode</h4>
+          <p class="text-sm text-gray-600">Enable detailed logging for troubleshooting</p>
+        </div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="debugModeToggle">
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <!-- Debug Tools -->
+      <div class="setting-item p-3 border border-blue-200 rounded-lg bg-blue-50 mb-3">
+        <div class="flex justify-between items-center mb-2">
+          <div>
+            <h4 class="font-medium text-blue-800">Debug Tools</h4>
+            <p class="text-sm text-blue-600">Test and verify cookie configuration</p>
+          </div>
+          <div class="flex gap-2">
+            <button id="testCookiesBtn" class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded-lg text-sm">
+              Test Cookies
+            </button>
+            <button id="clearTestCookiesBtn" class="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-lg text-sm">
+              Clear Test Cookies
+            </button>
+          </div>
+        </div>
+        <div id="cookieTestResult" class="text-sm mt-2 p-2 rounded bg-white border" style="display: none;">
+          <!-- Test results will appear here -->
+        </div>
+      </div>
+
+      <!-- Reset Settings -->
+      <div class="setting-item p-3 border border-red-200 rounded-lg bg-red-50">
+        <div class="flex justify-between items-center">
+          <div>
+            <h4 class="font-medium text-red-800">Reset Settings</h4>
+            <p class="text-sm text-red-600">Reset all settings to default values</p>
+          </div>
+          <button id="resetBtn" class="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-lg text-sm">
+            Reset
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Cookie Modal -->
+  <div id="cookieModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center" style="display: none;">
+    <div class="bg-white rounded-2xl p-6 w-96 max-w-full mx-4">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-lg font-semibold text-gray-800" id="modalTitle">Add Cookie</h3>
+        <button id="closeModalBtn" class="text-gray-500 hover:text-gray-700">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+
+      <div class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Cookie Name</label>
+          <input type="text" id="cookieName" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                 placeholder="e.g., session_id">
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Cookie Value</label>
+          <input type="text" id="cookieValue" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                 placeholder="Cookie value">
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Domain (optional)</label>
+          <input type="text" id="cookieDomain" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                 placeholder="e.g., .myreadingmanga.info">
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Path (optional)</label>
+          <input type="text" id="cookiePath" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                 placeholder="e.g., /" value="/">
+        </div>
+
+        <div class="flex items-center">
+          <input type="checkbox" id="cookieSecure" class="mr-2">
+          <label class="text-sm text-gray-700">Secure (HTTPS only)</label>
+        </div>
+
+        <div class="flex items-center">
+          <input type="checkbox" id="cookieHttpOnly" class="mr-2">
+          <label class="text-sm text-gray-700">HTTP Only</label>
+        </div>
+      </div>
+
+      <div class="flex justify-end space-x-3 mt-6">
+        <button id="cancelCookieBtn" class="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50">
+          Cancel
+        </button>
+        <button id="saveCookieBtn" class="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg">
+          Save Cookie
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script src="settings.js"></script>
+</body>
+
+</html>
