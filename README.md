@@ -5,7 +5,8 @@ Download bulk images and videos from myreadingmanga.info.
 ## Features
 
 - Download bulk images and videos from myreadingmanga.info.
-- Turn manga/doujin into a zip file or pdf file
+- Download manga/doujin into a ZIP file or PDF file
+- Support downloading videos, GIFs, images in one place into a ZIP format
 - that it...
 
 ## Installation
@@ -18,8 +19,11 @@ All the docs moved to the [userscript](https://github.com/NYT92/mrm-downloader/t
 
 1. Download the extension from the [releases](https://github.com/NYT92/mrm-downloader/releases) page.
 2. Click the ``mrm-downloader-x.x.x.xpi`` file
-3. Click on `Install` for the extension and allow it when prompted.
-4. You can now use the extension by going to any manga/doujin/videos page on myreadingmanga.info.
+3. Allow all of these it when prompted.  
+   <img width="410" height="206" alt="zen_Ng4SZM8P8F" src="https://github.com/user-attachments/assets/efb097fa-2b82-43b2-be9f-9d80965b18ed" />  
+   <img width="411" height="423" alt="zen_pkTTCDUWLv" src="https://github.com/user-attachments/assets/1d2d279a-7524-46eb-a91a-890691bcb95d" />
+
+5. You can now use the extension by going to any manga/doujin/videos page on myreadingmanga.info.
 
 ### Chrome
 
@@ -42,7 +46,7 @@ To fix this for the uBlock origin user simply go to the `settings > my filter` a
 
 ## Support
 
-If there is any problem, leave a comment, create an issue, or contact me via my Discord, @nyt92. Please be nice and modify it whatever you want. Also, since everything is logged, open the console (Ctrl+Shift+I) or (F12), then go to the console tab and screenshot it for me.
+If you encounter any issues, please leave a comment, create an issue, or contact me via Discord at ``@nyt92``. Please feel free to modify it as you see fit. Also, since everything is logged, open the console (Ctrl+Shift+I) or (F12), then go to the console tab and screenshot it for me.
 
 ## License
 
