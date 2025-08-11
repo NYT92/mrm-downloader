@@ -4,7 +4,13 @@
   "version": "1.0.0",
   "description": "Download video and bulk images from myreadingmanga manga/doujin page.",
   "author": "nyt92",
-  "permissions": ["storage", "downloads", "scripting"],
+  "permissions": [
+    "storage",
+    "downloads",
+    "scripting",
+    "tabs",
+    "declarativeNetRequest"
+  ],
   "icons": {
     "16": "./icons/icon16.png",
     "32": "./icons/icon32.png",
@@ -14,6 +20,15 @@
   "action": {
     "default_popup": "popup.html",
     "default_title": "MRM Downloader"
+  },
+  "declarative_net_request": {
+    "rule_resources": [
+      {
+        "id": "mrm-rules",
+        "enabled": true,
+        "path": "rules.json"
+      }
+    ]
   },
   "host_permissions": [
     "https://myreadingmanga.info/*",
@@ -35,6 +50,9 @@
       ]
     }
   ],
+  "background": {
+    "service_worker": "background.js"
+  },
   "web_accessible_resources": [
     {
       "resources": [

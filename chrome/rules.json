@@ -1,0 +1,49 @@
+[
+  {
+    "id": 1,
+    "priority": 1,
+    "action": {
+      "type": "modifyHeaders",
+      "requestHeaders": [
+        { "header": "referer", "operation": "set", "value": "https://myreadingmanga.info/" },
+        { "header": "origin", "operation": "set", "value": "https://myreadingmanga.info" }
+      ]
+    },
+    "condition": {
+      "resourceTypes": ["image", "media", "xmlhttprequest"],
+      "requestDomains": [
+        "i1.myreadingmanga.info",
+        "i2.myreadingmanga.info",
+        "i3.myreadingmanga.info",
+        "i4.myreadingmanga.info",
+        "i5.myreadingmanga.info",
+        "i6.myreadingmanga.info"
+      ]
+    }
+  },
+  {
+    "id": 2,
+    "priority": 1,
+    "action": {
+      "type": "modifyHeaders",
+      "responseHeaders": [
+        { "header": "access-control-allow-origin", "operation": "set", "value": "https://myreadingmanga.info" },
+        { "header": "access-control-allow-credentials", "operation": "set", "value": "true" },
+        { "header": "access-control-allow-headers", "operation": "set", "value": "*" }
+      ]
+    },
+    "condition": {
+      "resourceTypes": ["image", "media", "xmlhttprequest"],
+      "requestDomains": [
+        "i1.myreadingmanga.info",
+        "i2.myreadingmanga.info",
+        "i3.myreadingmanga.info",
+        "i4.myreadingmanga.info",
+        "i5.myreadingmanga.info",
+        "i6.myreadingmanga.info"
+      ]
+    }
+  }
+]
+
+

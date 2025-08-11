@@ -1,3 +1,3 @@
-# MRM Downloader
+# MRM Downloader (Chrome Version)
 
-For Chrome user, this extension just only work if you input your own cookies but im too lazy to make it work right now.
+This is the Chrome version of the MRM Downloader. It might have limited feature like Settings page and written entirely out of AI (blame the manifest v3 that chrome fucking made)...

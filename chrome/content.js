@@ -117,6 +117,20 @@
   }
 
   // Listen for messages from popup
+  function ensurePageFetchBridge() {
+    return new Promise((resolve) => {
+      // Ask background service worker to install the bridge in MAIN world
+      try {
+        chrome.runtime.sendMessage({ type: "INSTALL_PAGE_FETCH_BRIDGE" }, () => {
+          // Ignore errors; resolve regardless to proceed
+          resolve();
+        });
+      } catch (_) {
+        resolve();
+      }
+    });
+  }
+
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message && message.type === "GET_MRM_DATA") {
       const contentType = determineContentType();
@@ -130,6 +144,47 @@
         hasContent: contentType.hasContent || false,
         reason: contentType.reason,
       });
+      return false;
+    }
+
+    if (message && message.type === "PAGE_FETCH") {
+      // Ensure bridge is installed via background (avoids inline script injection blocked by CSP)
+      ensurePageFetchBridge().then(() => {
+      const requestId = `mrm_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+
+      function handleMessage(event) {
+        const data = event.data;
+        if (!data || data.source !== "mrm-page" || data.type !== "MRM_PAGE_FETCH_RESPONSE") return;
+        if (data.requestId !== requestId) return;
+        window.removeEventListener("message", handleMessage, false);
+          clearTimeout(timeoutId);
+        sendResponse({
+          ok: !!data.ok,
+          status: data.status,
+          statusText: data.statusText,
+          headers: data.headers,
+          body: data.body,
+          responseType: data.responseType,
+          error: data.error || null,
+        });
+      }
+
+      window.addEventListener("message", handleMessage, false);
+        const timeoutId = setTimeout(() => {
+          try { window.removeEventListener("message", handleMessage, false); } catch (_) {}
+          try { sendResponse({ ok: false, error: "PAGE_FETCH_TIMEOUT" }); } catch (_) {}
+        }, 8000);
+        window.postMessage({
+        source: "mrm-extension",
+        type: "MRM_PAGE_FETCH_REQUEST",
+        requestId,
+        url: message.url,
+        options: message.options || { method: "GET" },
+        wantBody: !!message.wantBody,
+          responseType: message.responseType || "bytes",
+      }, "*");
+      });
+      return true; // keep the channel open for async sendResponse
     }
   });
 })(); 

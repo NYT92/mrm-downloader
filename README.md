@@ -27,15 +27,28 @@ All the docs moved to the [userscript](https://github.com/NYT92/mrm-downloader/t
 
 ### Chrome
 
-> IN PROGRESS
+> This may apply to other Chromium-based browsers like Brave, Edge, etc but I have not tested it on other browsers just yet.
+
+1. Download or clone this repository to your computer.
+2. Open Google Chrome and go to `chrome://extensions/`.
+3. Enable **Developer mode** (toggle in the top right corner).
+4. Click the **"Load unpacked"** button.
+5. In the file dialog, select the `chrome` folder from this repository (the folder containing `manifest.json`).
+6. The extension should now appear in your extensions list and be ready to use.
+
+> You may need to pin the extension to your toolbar for easy access.
+
+**Note:**  
+If you update the extension files, you can click the "Reload" button on the extension card in `chrome://extensions/` to apply changes.
 
 ## Contributing
 
-If you want to contribute, please feel free to do so. This project is half-vibe coded and half-coded by me.
+If you want to contribute, please feel free to do so. This project is half-vibe coded and half-coded by me because it is for my internal tools but I would love to share my work...
 
 > SOON
 
 ## Adblocker (off topic)
+
 If you use any adblocker, myreadingmanga will not work and it is not our script that causes the problem. The problem is that the adblocker blocks the main important URL that accesses those resources. 
 To fix this for the uBlock origin user simply go to the `settings > my filter` and add those rules in and apply.
 

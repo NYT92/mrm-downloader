@@ -1,10 +1,24 @@
 let currentDownload = null;
 let downloadHistory = [];
 let currentView = "main";
+let mrmSettings = {
+  useCookies: true,
+  retryCount: 3,
+  timeout: 30,
+  debugMode: false,
+  cookieSource: "auto",
+  cookies: [],
+  autoRetrievedCookies: [],
+};
 
 document.addEventListener("DOMContentLoaded", async function () {
   await loadDownloadHistory();
+  await loadSettings();
   await checkPageContent();
+
+  const version = chrome.runtime.getManifest().version;
+  document.getElementById("version").textContent = `v${version}`;
+
   setupEventListeners();
   updateUI();
 });
@@ -24,6 +38,20 @@ async function saveDownloadHistory() {
     await chrome.storage.local.set({ downloadHistory });
   } catch (error) {
     console.error("[MRM] Error saving download history:", error);
+  }
+}
+
+async function loadSettings() {
+  try {
+    const result = await chrome.storage.local.get(["mrmSettings"]);
+    if (result.mrmSettings) {
+      mrmSettings = { ...mrmSettings, ...result.mrmSettings };
+    }
+    if (mrmSettings.debugMode) {
+      console.log("[MRM] Settings loaded:", mrmSettings);
+    }
+  } catch (error) {
+    console.error("[MRM] Error loading settings:", error);
   }
 }
 
@@ -70,19 +98,26 @@ function onError(error) {
 
 async function checkPageContent() {
   try {
-    chrome.tabs
-      .query({ url: "*://*.myreadingmanga.info/*" })
-      .then(getTabsUrl, onError);
+    chrome.tabs.query({ url: "*://*.myreadingmanga.info/*" }).then(getTabsUrl, onError);
 
     const data = await getMRMData();
     const downloadImagesBtn = document.getElementById("downloadImagesBtn");
+    const downloadAllBtn = document.getElementById("downloadAllBtn");
+    const downloadPdfBtn = document.getElementById("downloadPdfBtn");
+    const downloadVideoBtn = document.getElementById("downloadVideoBtn");
 
     if (tabsUrl.includes("myreadingmanga.info")) {
+      if (data && data.page) {
+        const pn = document.getElementById("pageNumber");
+        if (pn) pn.textContent = data.page;
+      }
       if (data && data.contentType) {
         switch (data.contentType) {
           case "video":
-            downloadImagesBtn.style.display = "block";
-            downloadImagesBtn.textContent = "Download video";
+            downloadVideoBtn.style.display = "block";
+            downloadImagesBtn.style.display = "none";
+            downloadPdfBtn.style.display = "none";
+            downloadAllBtn.style.display = data.images && data.images.length > 0 ? "block" : "none";
             document.querySelector("h2").textContent =
               data.title || "Video Content";
             document.getElementById("statusText").textContent = "Ready";
@@ -90,7 +125,17 @@ async function checkPageContent() {
 
           case "images":
             downloadImagesBtn.style.display = "block";
-            downloadImagesBtn.textContent = "Download images";
+            downloadImagesBtn.textContent = "Download Images (ZIP)";
+            if (data.images && data.images.length > 0 && !data.video) {
+              downloadPdfBtn.style.display = "block";
+              const pdfImageCount = document.getElementById("pdfImageCount");
+              if (pdfImageCount) pdfImageCount.textContent = data.images.length;
+            } else {
+              downloadPdfBtn.style.display = "none";
+            }
+            const imageCount = document.getElementById("imageCount");
+            if (imageCount && data.images) imageCount.textContent = data.images.length;
+            downloadAllBtn.style.display = data.video ? "block" : "none";
             document.querySelector("h2").textContent =
               data.title || "Image Content";
             document.getElementById("statusText").textContent = "Ready";
@@ -99,6 +144,9 @@ async function checkPageContent() {
           case "none":
           default:
             downloadImagesBtn.style.display = "none";
+            downloadPdfBtn.style.display = "none";
+            downloadVideoBtn.style.display = "none";
+            downloadAllBtn.style.display = "none";
             document.querySelector("h2").textContent =
               data.title || "No content selected";
             if (data.reason === "excluded_page") {
@@ -146,11 +194,23 @@ async function checkPageContent() {
   }
 }
 
-//event listeners
+  //event listeners
 function setupEventListeners() {
   document
     .getElementById("downloadImagesBtn")
     .addEventListener("click", handleDownloadClick);
+
+    document
+      .getElementById("downloadPdfBtn")
+      .addEventListener("click", handlePdfDownloadClick);
+
+    document
+      .getElementById("downloadVideoBtn")
+      .addEventListener("click", handleDownloadClick);
+
+    document
+      .getElementById("downloadAllBtn")
+      .addEventListener("click", handleDownloadAllClick);
 
   document
     .getElementById("downloadBtn")
@@ -285,6 +345,7 @@ async function clearHistory() {
 function setDownloadButtonState(isDisabled, text) {
   const downloadImagesBtn = document.getElementById("downloadImagesBtn");
   const downloadBtn = document.getElementById("downloadBtn");
+  const downloadAllBtn = document.getElementById("downloadAllBtn");
 
   if (downloadImagesBtn) {
     downloadImagesBtn.disabled = isDisabled;
@@ -294,6 +355,13 @@ function setDownloadButtonState(isDisabled, text) {
   if (downloadBtn) {
     downloadBtn.disabled = isDisabled;
     if (text) downloadBtn.textContent = text;
+  }
+
+  if (downloadAllBtn) {
+    downloadAllBtn.disabled = isDisabled;
+    if (text && document.activeElement === downloadAllBtn) {
+      downloadAllBtn.querySelector("#allButtonText").textContent = text;
+    }
   }
 }
 
@@ -423,7 +491,7 @@ function updateUI() {
 async function downloadImages(images, title, page = "1") {
   if (!images.length) {
     alert("No images found on this page.");
-    setDownloadButtonState(false, "Download images");
+    setDownloadButtonState(false, "Download images (ZIP)");
     return;
   }
 
@@ -441,7 +509,10 @@ async function downloadImages(images, title, page = "1") {
       setProgress(percent, `Downloading image ${i + 1} of ${images.length}...`);
 
       try {
-        const response = await fetch(images[i]);
+        const response = await fetchWithSettings(images[i], {
+          headers: { Referer: tab.url },
+        });
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         const blob = await response.blob();
         const ext = blob.type.split("/")[1] || "jpg";
         zip.file(`image_${i + 1}.${ext}`, blob, { binary: true });
@@ -467,7 +538,7 @@ async function downloadImages(images, title, page = "1") {
     saveAs(content, filename);
 
     addToHistory({
-      title,
+      title: `${title} - Page ${page}`,
       url: tab.url,
       type: "images",
       status: "completed",
@@ -476,7 +547,7 @@ async function downloadImages(images, title, page = "1") {
 
     updateStatus("Download completed");
     currentDownload = null;
-    setDownloadButtonState(false, "Download images");
+    setDownloadButtonState(false, "Download Images (ZIP)");
 
     console.log("[MRM] Images download completed");
   } catch (error) {
@@ -491,7 +562,7 @@ async function downloadImages(images, title, page = "1") {
       progress: 0,
     });
     currentDownload = null;
-    setDownloadButtonState(false, "Download images");
+    setDownloadButtonState(false, "Download Images (ZIP)");
     alert("Images download failed. Check console for details.");
   }
 }
@@ -510,7 +581,7 @@ async function downloadVideo(videoUrl, title) {
   setDownloadButtonState(true, "Downloading...");
 
   try {
-    const response = await fetch(videoUrl);
+    const response = await fetchWithSettings(videoUrl, { headers: { Referer: tab.url } });
 
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
@@ -558,3 +629,340 @@ async function downloadVideo(videoUrl, title) {
     alert("Video download failed. Check console for details.");
   }
 } 
+
+async function handlePdfDownloadClick() {
+  try {
+    const data = await getMRMData();
+    if (!data) {
+      alert("No content found on this page.");
+      setPdfButtonState(false);
+      return;
+    }
+
+    if (data.images && data.images.length > 0) {
+      await downloadPdf(data.images, data.title, data.page);
+    } else {
+      alert("No images found to generate PDF.");
+      setPdfButtonState(false, "Generate PDF");
+    }
+  } catch (error) {
+    console.error("[MRM] PDF download error:", error);
+    setPdfButtonState(false, "Generate PDF");
+    alert("Failed to generate PDF. Check console for details.");
+  }
+}
+
+async function handleDownloadAllClick() {
+  try {
+    const data = await getMRMData();
+    if (!data) {
+      alert("No content found on this page.");
+      setDownloadButtonState(false);
+      return;
+    }
+
+    const hasImages = data.images && data.images.length > 0;
+    const hasVideo = !!data.video;
+
+    if (!hasImages && !hasVideo) {
+      alert("No downloadable content found.");
+      setDownloadButtonState(false);
+      return;
+    }
+
+    await downloadAllMedia({
+      images: hasImages ? data.images : [],
+      videoUrl: hasVideo ? data.video : null,
+      title: data.title,
+      page: data.page || "1",
+    });
+  } catch (error) {
+    console.error("[MRM] Download all error:", error);
+    alert("Download failed. Check console for details.");
+    setDownloadButtonState(false);
+  }
+}
+
+function setPdfButtonState(isDisabled, text) {
+  const downloadPdfBtn = document.getElementById("downloadPdfBtn");
+  if (downloadPdfBtn) {
+    downloadPdfBtn.disabled = isDisabled;
+    if (text) {
+      const buttonText = document.getElementById("pdfButtonText");
+      if (buttonText) buttonText.textContent = text;
+    }
+  }
+}
+
+async function fetchWithSettings(url, options = {}) {
+  const tab = await getActiveTab();
+
+  const pageFetchOptions = { method: (options && options.method) || "GET" };
+  if (options && options.headers && options.headers.Referer) {
+    pageFetchOptions.referrer = options.headers.Referer;
+  }
+
+  let lastError;
+  for (let attempt = 1; attempt <= mrmSettings.retryCount; attempt++) {
+    try {
+      const pageResponse = await chrome.tabs.sendMessage(tab.id, {
+        type: "PAGE_FETCH",
+        url,
+        options: pageFetchOptions,
+        wantBody: true,
+        responseType: "bytes",
+      });
+
+      if (!pageResponse) throw new Error("No response from page context");
+      if (!pageResponse.ok) {
+        const statusInfo =
+          typeof pageResponse.status !== "undefined"
+            ? `${pageResponse.status} ${pageResponse.statusText || ""}`
+            : pageResponse.error || "Request failed";
+        throw new Error(`HTTP error: ${statusInfo}`);
+      }
+
+      const headers = new Headers(pageResponse.headers || []);
+      const contentType = headers.get("content-type") || "application/octet-stream";
+      let blob;
+      if (pageResponse.responseType === 'bytes' && Array.isArray(pageResponse.body)) {
+        const u8 = new Uint8Array(pageResponse.body);
+        blob = new Blob([u8], { type: contentType });
+      } else if (pageResponse.responseType === 'text' && typeof pageResponse.body === 'string') {
+        blob = new Blob([pageResponse.body], { type: contentType });
+      } else if (pageResponse.responseType === 'json') {
+        blob = new Blob([JSON.stringify(pageResponse.body)], { type: 'application/json' });
+      } else {
+        // Fallback attempt
+        blob = new Blob([pageResponse.body], { type: contentType });
+      }
+
+      return {
+        ok: true,
+        status: pageResponse.status,
+        statusText: pageResponse.statusText,
+        headers,
+        blob: async () => blob,
+      };
+    } catch (error) {
+      lastError = error;
+      if (attempt < mrmSettings.retryCount) {
+        const waitTime = Math.pow(2, attempt - 1) * 1000;
+        await new Promise((resolve) => setTimeout(resolve, waitTime));
+      }
+    }
+  }
+
+  const fallbackOptions = {
+    ...options,
+    timeout: mrmSettings.timeout * 1000,
+    credentials: "include",
+    mode: "cors",
+  };
+
+  let lastFallbackError;
+  for (let attempt = 1; attempt <= mrmSettings.retryCount; attempt++) {
+    try {
+      const res = await fetch(url, fallbackOptions);
+      return res;
+    } catch (err) {
+      lastFallbackError = err;
+      if (attempt < mrmSettings.retryCount) {
+        const waitTime = Math.pow(2, attempt - 1) * 1000;
+        await new Promise((resolve) => setTimeout(resolve, waitTime));
+      }
+    }
+  }
+
+  throw lastError || lastFallbackError || new Error("Fetch failed");
+}
+
+async function downloadAllMedia({ images, videoUrl, title, page = "1" }) {
+  const hasImages = images && images.length > 0;
+  const hasVideo = !!videoUrl;
+
+  if (!hasImages && !hasVideo) {
+    alert("No images or video to download.");
+    return;
+  }
+
+  const tab = await getActiveTab();
+  currentDownload = { type: "all", title, url: tab.url };
+  updateStatus("Downloading media...");
+  setDownloadButtonState(true, "Downloading...");
+  setProgress(0, "Preparing files...");
+
+  const zip = new JSZip();
+
+  try {
+    let progressBase = 0;
+    let progressSpan = hasImages && hasVideo ? 45 : 90;
+
+    if (hasImages) {
+      for (let i = 0; i < images.length; i++) {
+        const percent = progressBase + ((i + 1) / images.length) * progressSpan;
+        setProgress(percent, `Downloading image ${i + 1} of ${images.length}...`);
+        try {
+          const response = await fetchWithSettings(images[i], { headers: { Referer: tab.url } });
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          const blob = await response.blob();
+          const mime = blob.type || "image/jpeg";
+          const subtype = mime.split("/")[1] || "jpg";
+          zip.file(`images/image_${i + 1}.${subtype}`, blob, { binary: true });
+        } catch (e) {
+          console.error("[MRM] Error downloading image", images[i], e);
+        }
+      }
+      progressBase += progressSpan;
+    }
+
+    if (hasVideo) {
+      setProgress(progressBase + 5, "Fetching video...");
+      const response = await fetchWithSettings(videoUrl, { headers: { Referer: tab.url } });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const blob = await response.blob();
+      const guessedExt = (() => {
+        const byMime = blob.type && blob.type.includes("/") ? blob.type.split("/")[1] : null;
+        const byUrl = videoUrl.split(".").pop();
+        const candidate = (byMime || byUrl || "mp4").split(/[?#]/)[0];
+        return candidate.length > 5 ? "mp4" : candidate;
+      })();
+      zip.file(`video/video.${guessedExt}`, blob, { binary: true });
+      setProgress(progressBase + 45, "Added video to ZIP...");
+    }
+
+    setProgress(95, "Creating ZIP file...");
+    const content = await zip.generateAsync({ type: "blob" });
+
+    const safeTitle = title.replace(/[^a-z0-9]/gi, "_").toLowerCase();
+    const filename = `${safeTitle}_p${page}_all.zip`;
+    saveAs(content, filename);
+
+    setProgress(100, "Saved ZIP file");
+
+    addToHistory({
+      title: `${title} - Page ${page}`,
+      url: tab.url,
+      type: "all",
+      status: "completed",
+      progress: 100,
+    });
+
+    updateStatus("Download completed");
+    currentDownload = null;
+    setDownloadButtonState(false, "Download All (ZIP)");
+  } catch (error) {
+    console.error("[MRM] All media download error:", error);
+    updateStatus("Download failed");
+    setProgress(0, "Download failed");
+    addToHistory({
+      title,
+      url: tab.url,
+      type: "all",
+      status: "failed",
+      progress: 0,
+    });
+    currentDownload = null;
+    setDownloadButtonState(false, "Download All (ZIP)");
+    alert("All media download failed. Check console for details.");
+  }
+}
+
+async function downloadPdf(images, title, page = "1") {
+  if (!images.length) {
+    alert("No images found on this page.");
+    setPdfButtonState(false, "Generate PDF");
+    return;
+  }
+
+  const tab = await getActiveTab();
+  currentDownload = { type: "pdf", title, url: tab.url };
+  updateStatus("Generating PDF...");
+  setPdfButtonState(true, "Generating...");
+  setProgress(0, "Initializing PDF generation...");
+
+  try {
+    let jsPDF;
+    if (window.jspdf && window.jspdf.jsPDF) {
+      jsPDF = window.jspdf.jsPDF;
+    } else if (window.jsPDF) {
+      jsPDF = window.jsPDF;
+    } else {
+      throw new Error("jsPDF library not found. Please check if jspdf.umd.min.js is loaded correctly.");
+    }
+
+    let pdf = null;
+
+    for (let i = 0; i < images.length; i++) {
+      const percent = ((i + 1) / images.length) * 90;
+      setProgress(percent, `Processing image ${i + 1} of ${images.length}...`);
+
+      try {
+        const response = await fetchWithSettings(images[i], { headers: { Referer: tab.url } });
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        const blob = await response.blob();
+
+        const base64 = await new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.readAsDataURL(blob);
+        });
+
+        const img = new Image();
+        img.src = base64;
+        await new Promise((resolve) => {
+          img.onload = resolve;
+        });
+
+        const orientation = img.width > img.height ? "l" : "p";
+        if (!pdf) {
+          pdf = new jsPDF(orientation, "px", [img.width, img.height]);
+        } else {
+          pdf.addPage([img.width, img.height], orientation);
+        }
+
+        let imgFormat = "JPEG";
+        try {
+          const mime = (base64.split(",")[0] || "").toLowerCase();
+          if (mime.includes("png")) imgFormat = "PNG";
+        } catch (_) {}
+
+        pdf.addImage(base64, imgFormat, 0, 0, img.width, img.height);
+      } catch (e) {
+        console.error("[MRM] Error processing image for PDF", images[i], e);
+      }
+    }
+
+    setProgress(95, "Finalizing PDF...");
+    const safeTitle = title.replace(/[^a-z0-9]/gi, "_").toLowerCase();
+    const filename = `${safeTitle}_p${page}_manga.pdf`;
+    pdf.save(filename);
+
+    setProgress(100, "PDF saved!");
+    addToHistory({
+      title: `${title} - Page ${page} (PDF)`,
+      url: tab.url,
+      type: "pdf",
+      status: "completed",
+      progress: 100,
+    });
+
+    updateStatus("PDF generation completed");
+    currentDownload = null;
+    setPdfButtonState(false, "Generate PDF");
+  } catch (error) {
+    console.error("[MRM] PDF generation error:", error);
+    updateStatus("PDF generation failed");
+    setProgress(0, "PDF generation failed");
+    addToHistory({
+      title,
+      url: tab.url,
+      type: "pdf",
+      status: "failed",
+      progress: 0,
+    });
+    currentDownload = null;
+    setPdfButtonState(false, "Generate PDF");
+    alert("PDF generation failed. Check console for details.");
+  }
+}
