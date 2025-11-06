@@ -138,5 +138,3 @@ browser.webRequest.onErrorOccurred.addListener(
       "https://i6.myreadingmanga.info/*",
     ] }
 );
-
-
