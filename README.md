@@ -7,6 +7,9 @@ Download bulk images and videos from myreadingmanga.info.
 - Download bulk images and videos from myreadingmanga.info.
 - Download manga/doujin into a ZIP file or PDF file
 - Support downloading videos, GIFs, images in one place into a ZIP format
+- Hide the AI-generated post by default
+- Supports Firefox and Chrome
+- Supports auto/custom cloudflare cookies to bypass the cloudflare captcha
 - that it...
 
 ## Installation

@@ -8,7 +8,8 @@ let mrmSettings = {
   debugMode: false,
   cookieSource: "auto", // "auto" or "custom"
   cookies: [],
-  autoRetrievedCookies: []
+  autoRetrievedCookies: [],
+  hideAIListing: true,
 };
 
 document.addEventListener("DOMContentLoaded", async function () {
@@ -58,29 +59,40 @@ function getCookieHeaders() {
   if (!mrmSettings.useCookies) {
     return {};
   }
-  
+
   let cookiesToUse = [];
-  
-  if (mrmSettings.cookieSource === "auto" && mrmSettings.autoRetrievedCookies && mrmSettings.autoRetrievedCookies.length > 0) {
+
+  if (
+    mrmSettings.cookieSource === "auto" &&
+    mrmSettings.autoRetrievedCookies &&
+    mrmSettings.autoRetrievedCookies.length > 0
+  ) {
     cookiesToUse = mrmSettings.autoRetrievedCookies;
-  } else if (mrmSettings.cookieSource === "custom" && mrmSettings.cookies && mrmSettings.cookies.length > 0) {
+  } else if (
+    mrmSettings.cookieSource === "custom" &&
+    mrmSettings.cookies &&
+    mrmSettings.cookies.length > 0
+  ) {
     cookiesToUse = mrmSettings.cookies;
   }
-  
+
   if (cookiesToUse.length === 0) {
     return {};
   }
-  
+
   const cookieString = cookiesToUse
-    .map(cookie => `${cookie.name}=${cookie.value}`)
+    .map((cookie) => `${cookie.name}=${cookie.value}`)
     .join("; ");
-  
+
   if (mrmSettings.debugMode) {
-    console.log(`[MRM Debug] Using ${cookiesToUse.length} cookies (${mrmSettings.cookieSource}):`, cookieString);
+    console.log(
+      `[MRM Debug] Using ${cookiesToUse.length} cookies (${mrmSettings.cookieSource}):`,
+      cookieString
+    );
   }
-  
+
   return {
-    "Cookie": cookieString
+    Cookie: cookieString,
   };
 }
 
@@ -91,10 +103,18 @@ async function setCookiesInBrowser(url) {
   }
 
   let cookiesToUse = [];
-  
-  if (mrmSettings.cookieSource === "auto" && mrmSettings.autoRetrievedCookies && mrmSettings.autoRetrievedCookies.length > 0) {
+
+  if (
+    mrmSettings.cookieSource === "auto" &&
+    mrmSettings.autoRetrievedCookies &&
+    mrmSettings.autoRetrievedCookies.length > 0
+  ) {
     cookiesToUse = mrmSettings.autoRetrievedCookies;
-  } else if (mrmSettings.cookieSource === "custom" && mrmSettings.cookies && mrmSettings.cookies.length > 0) {
+  } else if (
+    mrmSettings.cookieSource === "custom" &&
+    mrmSettings.cookies &&
+    mrmSettings.cookies.length > 0
+  ) {
     cookiesToUse = mrmSettings.cookies;
   }
 
@@ -104,7 +124,9 @@ async function setCookiesInBrowser(url) {
   }
 
   const urlObj = new URL(url);
-  console.log(`[MRM Debug] Setting ${cookiesToUse.length} cookies for ${urlObj.origin}`);
+  console.log(
+    `[MRM Debug] Setting ${cookiesToUse.length} cookies for ${urlObj.origin}`
+  );
 
   for (const cookie of cookiesToUse) {
     try {
@@ -113,7 +135,7 @@ async function setCookiesInBrowser(url) {
         cookie.domain, // Original domain
         urlObj.hostname, // Exact hostname
         `.${urlObj.hostname}`, // Domain with leading dot
-        `.${urlObj.hostname.split('.').slice(-2).join('.')}`, // Parent domain
+        `.${urlObj.hostname.split(".").slice(-2).join(".")}`, // Parent domain
       ].filter(Boolean);
 
       let cookieSet = false;
@@ -125,8 +147,8 @@ async function setCookiesInBrowser(url) {
             value: cookie.value,
             domain: domain,
             path: cookie.path || "/",
-            secure: cookie.secure || urlObj.protocol === 'https:',
-            httpOnly: cookie.httpOnly || false
+            secure: cookie.secure || urlObj.protocol === "https:",
+            httpOnly: cookie.httpOnly || false,
           };
 
           // Add partition key if available
@@ -135,16 +157,23 @@ async function setCookiesInBrowser(url) {
           }
 
           await browser.cookies.set(cookieDetails);
-          console.log(`[MRM Debug] Successfully set cookie: ${cookie.name} for domain: ${domain}`);
+          console.log(
+            `[MRM Debug] Successfully set cookie: ${cookie.name} for domain: ${domain}`
+          );
           cookieSet = true;
           break;
         } catch (domainError) {
-          console.log(`[MRM Debug] Failed to set cookie ${cookie.name} for domain ${domain}:`, domainError.message);
+          console.log(
+            `[MRM Debug] Failed to set cookie ${cookie.name} for domain ${domain}:`,
+            domainError.message
+          );
         }
       }
 
       if (!cookieSet) {
-        console.error(`[MRM Debug] Failed to set cookie ${cookie.name} for any domain`);
+        console.error(
+          `[MRM Debug] Failed to set cookie ${cookie.name} for any domain`
+        );
       }
     } catch (error) {
       console.error(`[MRM Debug] Failed to set cookie ${cookie.name}:`, error);
@@ -158,7 +187,7 @@ async function fetchWithSettings(url, options = {}) {
   const tab = await getActiveTab();
 
   const pageFetchOptions = {
-    method: (options && options.method) || 'GET',
+    method: (options && options.method) || "GET",
   };
   if (options && options.headers && options.headers.Referer) {
     pageFetchOptions.referrer = options.headers.Referer;
@@ -171,22 +200,26 @@ async function fetchWithSettings(url, options = {}) {
     try {
       console.log(`[MRM Debug] (Page) Fetch attempt ${attempt} for ${url}`);
       const pageResponse = await browser.tabs.sendMessage(tab.id, {
-        type: 'PAGE_FETCH',
+        type: "PAGE_FETCH",
         url,
         options: pageFetchOptions,
         wantBody: true,
-        responseType: 'arraybuffer'
+        responseType: "arraybuffer",
       });
 
-      if (!pageResponse) throw new Error('No response from page context');
+      if (!pageResponse) throw new Error("No response from page context");
 
       if (!pageResponse.ok) {
-        const statusInfo = typeof pageResponse.status !== 'undefined' ? `${pageResponse.status} ${pageResponse.statusText || ''}` : (pageResponse.error || 'Request failed');
+        const statusInfo =
+          typeof pageResponse.status !== "undefined"
+            ? `${pageResponse.status} ${pageResponse.statusText || ""}`
+            : pageResponse.error || "Request failed";
         throw new Error(`HTTP error: ${statusInfo}`);
       }
 
       const headers = new Headers(pageResponse.headers || []);
-      const contentType = headers.get('content-type') || 'application/octet-stream';
+      const contentType =
+        headers.get("content-type") || "application/octet-stream";
       const blob = new Blob([pageResponse.body], { type: contentType });
 
       const responseLike = {
@@ -194,13 +227,16 @@ async function fetchWithSettings(url, options = {}) {
         status: pageResponse.status,
         statusText: pageResponse.statusText,
         headers,
-        blob: async () => blob
+        blob: async () => blob,
       };
 
       return responseLike;
     } catch (error) {
       lastError = error;
-      console.error(`[MRM Debug] (Page) Fetch attempt ${attempt} failed for ${url}:`, error);
+      console.error(
+        `[MRM Debug] (Page) Fetch attempt ${attempt} failed for ${url}:`,
+        error
+      );
       if (attempt < mrmSettings.retryCount) {
         const waitTime = Math.pow(2, attempt - 1) * 1000;
         console.log(`[MRM Debug] Waiting ${waitTime}ms before retry...`);
@@ -213,29 +249,27 @@ async function fetchWithSettings(url, options = {}) {
 
   const defaultHeaders = {
     "User-Agent": navigator.userAgent,
-    "Accept": "image/webp,image/avif,image/*,*/*;q=0.8",
+    Accept: "image/webp,image/avif,image/*,*/*;q=0.8",
     "Accept-Language": "en-US,en;q=0.5",
     "Accept-Encoding": "gzip, deflate, br",
-    "DNT": "1",
-    "Connection": "keep-alive",
+    DNT: "1",
+    Connection: "keep-alive",
     "Sec-Fetch-Dest": "image",
     "Sec-Fetch-Mode": "no-cors",
     "Sec-Fetch-Site": "same-site",
-    "Pragma": "no-cache",
-    "Cache-Control": "no-cache"
   };
 
   const fallbackHeaders = {
     ...defaultHeaders,
-    ...(options.headers || {})
+    ...(options.headers || {}),
   };
 
   const fallbackOptions = {
     ...options,
     headers: fallbackHeaders,
     timeout: mrmSettings.timeout * 1000,
-    credentials: 'include',
-    mode: 'cors'
+    credentials: "include",
+    mode: "cors",
   };
 
   let lastFallbackError;
@@ -244,12 +278,17 @@ async function fetchWithSettings(url, options = {}) {
       console.log(`[MRM Debug] (Ext) Fetch attempt ${attempt} for ${url}`);
       const res = await fetch(url, fallbackOptions);
       if (!res.ok) {
-        console.error(`[MRM Debug] (Ext) Response status: ${res.status} ${res.statusText}`);
+        console.error(
+          `[MRM Debug] (Ext) Response status: ${res.status} ${res.statusText}`
+        );
       }
       return res;
     } catch (err) {
       lastFallbackError = err;
-      console.error(`[MRM Debug] (Ext) Fetch attempt ${attempt} failed for ${url}:`, err);
+      console.error(
+        `[MRM Debug] (Ext) Fetch attempt ${attempt} failed for ${url}:`,
+        err
+      );
       if (attempt < mrmSettings.retryCount) {
         const waitTime = Math.pow(2, attempt - 1) * 1000;
         console.log(`[MRM Debug] Waiting ${waitTime}ms before retry...`);
@@ -258,7 +297,7 @@ async function fetchWithSettings(url, options = {}) {
     }
   }
 
-  throw (lastError || lastFallbackError || new Error('Fetch failed'));
+  throw lastError || lastFallbackError || new Error("Fetch failed");
 }
 
 function addToHistory(download) {
@@ -833,8 +872,8 @@ async function downloadImages(images, title, page = "1") {
         // Add referrer header for image requests
         const response = await fetchWithSettings(images[i], {
           headers: {
-            "Referer": tab.url
-          }
+            Referer: tab.url,
+          },
         });
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
@@ -913,8 +952,8 @@ async function downloadVideo(videoUrl, title) {
     // Add referrer header for video requests
     const response = await fetchWithSettings(videoUrl, {
       headers: {
-        "Referer": tab.url
-      }
+        Referer: tab.url,
+      },
     });
 
     if (!response.ok) {
@@ -989,7 +1028,10 @@ async function downloadAllMedia({ images, videoUrl, title, page = "1" }) {
     if (hasImages) {
       for (let i = 0; i < images.length; i++) {
         const percent = progressBase + ((i + 1) / images.length) * progressSpan;
-        setProgress(percent, `Downloading image ${i + 1} of ${images.length}...`);
+        setProgress(
+          percent,
+          `Downloading image ${i + 1} of ${images.length}...`
+        );
         try {
           const response = await fetchWithSettings(images[i], {
             headers: { Referer: tab.url },
@@ -1015,7 +1057,8 @@ async function downloadAllMedia({ images, videoUrl, title, page = "1" }) {
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const blob = await response.blob();
       const guessedExt = (() => {
-        const byMime = blob.type && blob.type.includes("/") ? blob.type.split("/")[1] : null;
+        const byMime =
+          blob.type && blob.type.includes("/") ? blob.type.split("/")[1] : null;
         const byUrl = videoUrl.split(".").pop();
         const candidate = (byMime || byUrl || "mp4").split(/[?#]/)[0];
         return candidate.length > 5 ? "mp4" : candidate;
@@ -1096,8 +1139,8 @@ async function downloadPdf(images, title, page = "1") {
         // Add referrer header for PDF image requests
         const response = await fetchWithSettings(images[i], {
           headers: {
-            "Referer": tab.url
-          }
+            Referer: tab.url,
+          },
         });
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
@@ -1194,4 +1237,3 @@ function setPdfButtonState(isDisabled, text) {
     }
   }
 }
-

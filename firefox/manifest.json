@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "MRM Downloader",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Download video and bulk images from myreadingmanga manga/doujin page.",
   "author": "nyt92",
   "permissions": [

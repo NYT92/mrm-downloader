@@ -6,6 +6,7 @@ let settings = {
   cookieSource: "auto", // "auto" or "custom"
   cookies: [],
   autoRetrievedCookies: [],
+  hideAIListing: true,
 };
 
 let editingCookieIndex = -1;
@@ -87,6 +88,12 @@ function setupEventListeners() {
     });
 
   document
+    .getElementById("hideAIListingToggle")
+    .addEventListener("change", function () {
+      settings.hideAIListing = this.checked;
+    });
+
+  document
     .getElementById("retryCountSlider")
     .addEventListener("input", function () {
       settings.retryCount = parseInt(this.value);
@@ -133,6 +140,7 @@ function updateUI() {
   // Update toggles
   document.getElementById("useCookiesToggle").checked = settings.useCookies;
   document.getElementById("debugModeToggle").checked = settings.debugMode;
+  document.getElementById("hideAIListingToggle").checked = settings.hideAIListing;
 
   // Update sliders
   document.getElementById("retryCountSlider").value = settings.retryCount;
@@ -579,6 +587,7 @@ async function resetSettings() {
       cookieSource: "auto",
       cookies: [],
       autoRetrievedCookies: [],
+      hideAIListing: true,
     };
 
     updateUI();

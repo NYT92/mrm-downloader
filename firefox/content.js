@@ -26,7 +26,33 @@
     "/yaoi-manga/",
     "/manhwa/",
   ];
+
+  const includedPaths = ["/tag/ai-generate/"];
+
   const currentPath = window.location.pathname;
+  
+  if (includedPaths.some((path) => currentPath.startsWith(path))) {
+    const aiListing = document.querySelectorAll("article.tag-ai-generate");
+
+    if (!aiListing.length) return;
+
+    for (const element of aiListing) {
+      element.addEventListener("click", (event) => {
+        if (
+          confirm(
+            "Are you sure you want to view generated AI images instead of people hard work?"
+          )
+        ) {
+          element.style.filter = "none";
+          element.style.opacity = "1";
+        } else {
+          event.preventDefault();
+        }
+      });
+      element.style.filter = "blur(10px)";
+      element.style.opacity = "0.5";
+    }
+  }
   if (excludedPaths.some((path) => currentPath.startsWith(path))) return;
 
   function getImageSources() {
@@ -191,6 +217,53 @@
     document.documentElement.appendChild(script);
     script.remove();
   }
+
+  function hideAIListing() {
+    const aiListing = document.querySelectorAll(".tag-ai-generate");
+
+    if (!aiListing.length) return;
+
+    for (const element of aiListing) {
+      element.addEventListener("click", (event) => {
+        if (
+          confirm(
+            "Are you sure you want to view generated AI images instead of people hard work?"
+          )
+        ) {
+          element.style.filter = "none";
+          element.style.opacity = "1";
+        } else {
+          event.preventDefault();
+        }
+      });
+      element.style.filter = "blur(10px)";
+      element.style.opacity = "0.5";
+    }
+  }
+
+  async function initHideAIListing() {
+    try {
+      const result = await browser.storage.local.get(["mrmSettings"]);
+      const settings = result.mrmSettings || {};
+      const isEnabled = settings.hideAIListing !== false;
+      
+      if (isEnabled) {
+        if (document.readyState === "loading") {
+          document.addEventListener("DOMContentLoaded", hideAIListing);
+        } else {
+          hideAIListing();
+        }
+      }
+    } catch (error) {
+      console.error("[MRM] Error loading settings:", error);
+      if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", hideAIListing);
+      } else {
+        hideAIListing();
+      }
+    }
+  }
+  initHideAIListing();
 
   browser.runtime.onMessage.addListener((message) => {
     if (message && message.type === "GET_MRM_DATA") {
