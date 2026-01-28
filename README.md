@@ -5,6 +5,7 @@ Download bulk images and videos from myreadingmanga.info.
 ## Features
 
 - Download bulk images and videos from myreadingmanga.info including each pages
+- Bulk downloading support resume (Bulk Download option only)
 - Download manga/doujin into a ZIP file or PDF file
 - Support downloading videos, GIFs, images in one place into a ZIP format
 - Hide the AI-generated post by default
@@ -44,11 +45,19 @@ All the docs moved to the [userscript](https://github.com/NYT92/mrm-downloader/t
 **Note:**  
 If you update the extension files, you can click the "Reload" button on the extension card in `chrome://extensions/` to apply changes.
 
+## Issue
+
+You may need to refresh the page and try again for a few times to download the media. This is due to something that trigger the cloudflare detection. I am not sure how to fix this yet but it only happen for like a few times and eventually it will work. Be sure to check the ``Setting > Advance Option`` then find the ``Debug Tools`` and test the cookies to see if it return ``2xx``. If it return ``4xx`` then you need to update the cookies or resolve the cloudflare captcha.
+
+### Bulk Download Issue
+
+While downloading the next page, it will trigger the cloudflare detection and stop the download. There is a resume button but it will not work if the cloudflare detection is triggered and the file is already downloaded. You will need to restart the download and check the ``Debug Tools`` to see if the cookies are still returning ``2xx``.
+
+If you encounter any issues, please leave a comment, create an issue, or contact me via Discord at ``@nyt92``. Please feel free to modify it as you see fit. Also, since everything is logged, open the console (Ctrl+Shift+I) or (F12), then go to the console tab and screenshot it for me.
+
 ## Contributing
 
 If you want to contribute, please feel free to do so. This project is half-vibe coded and half-coded by me because it is for my internal tools but I would love to share my work...
-
-> SOON
 
 ## Adblocker (off topic)
 
@@ -59,15 +68,12 @@ To fix this for the uBlock origin user simply go to the `settings > my filter` a
 
 ![image](https://github.com/user-attachments/assets/70fc9cd1-0c7b-4674-a505-f8852a4d44b5)
 
-
-## Support
-
-If you encounter any issues, please leave a comment, create an issue, or contact me via Discord at ``@nyt92``. Please feel free to modify it as you see fit. Also, since everything is logged, open the console (Ctrl+Shift+I) or (F12), then go to the console tab and screenshot it for me.
-
 ## License
 
 The code is licensed under the GNU GPLv3. Read more [here](https://gist.github.com/kn9ts/cbe95340d29fc1aaeaa5dd5c059d2e60#file-gplv3-md)
 
 ## Legal
 
-I am not affiliated with myreadingmanga.info admin or moderator there and I create and use the script to download those files for personal archival or for viewing offline purposes. **If you have money, go ahead and support all of these artists there so that they can produce good shit for all**.
+I am not affiliated with myreadingmanga.info admin or moderator there and I create and use the script to download those files for personal archival or for viewing offline purposes. 
+
+**If you have money, go ahead and support all of these artists there so that they can produce good shit for all**.
