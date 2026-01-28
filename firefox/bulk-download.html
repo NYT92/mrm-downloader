@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>MRM Downloader - Bulk Downloader</title>
+  <script src="./scripts/tailwindcss-3.4.16.js"></script>
+  <style>
+    @tailwind base;
+    @tailwind components;
+    @tailwind utilities;
+
+    @import url('https://cdn-global.nyt92.eu.org/font/inter/inter.css');
+
+    body {
+      font-family: Inter, sans-serif;
+      width: 600px;
+      min-height: 500px;
+      margin: 0;
+      padding: 16px;
+      background-color: #f5f5f5;
+    }
+
+    .page-item {
+      transition: all 0.2s ease;
+    }
+
+    .page-item:hover {
+      background-color: #f8f9fa;
+    }
+
+    .status-pending {
+      background-color: #fef3c7;
+      color: #92400e;
+    }
+
+    .status-downloading {
+      background-color: #dbeafe;
+      color: #1e40af;
+    }
+
+    .status-completed {
+      background-color: #d1fae5;
+      color: #065f46;
+    }
+
+    .status-failed {
+      background-color: #fee2e2;
+      color: #991b1b;
+    }
+
+    .status-paused {
+      background-color: #e5e7eb;
+      color: #374151;
+    }
+  </style>
+</head>
+
+<body class="bg-gray-100">
+  <!-- Header -->
+  <div class="flex justify-between items-center mb-6">
+    <div>
+      <h1 class="text-2xl font-bold text-orange-500">Bulk Downloader</h1>
+      <p class="text-sm text-gray-600">Download multiple pages at once</p>
+    </div>
+    <button id="backBtn" class="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50">
+      ← Back
+    </button>
+  </div>
+
+  <!-- Configuration Card -->
+  <div id="configCard" class="bg-white rounded-2xl p-6 border border-gray-200 mb-4">
+    <h2 class="text-lg font-semibold text-gray-800 mb-4">Download Configuration</h2>
+
+    <!-- Current Page Info -->
+    <div class="mb-4 p-3 bg-blue-50 rounded-lg">
+      <p class="text-sm text-gray-700"><strong>Current Page:</strong> <span id="currentPageInfo">Loading...</span></p>
+      <p class="text-sm text-gray-700"><strong>Title:</strong> <span id="currentTitleInfo">Loading...</span></p>
+      <p class="text-sm text-gray-700"><strong>Latest Page:</strong> <span id="latestPageInfo">Detecting...</span></p>
+    </div>
+
+    <!-- Page Range Selection -->
+    <div class="grid grid-cols-2 gap-4 mb-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">Start Page</label>
+        <input type="number" id="startPage" min="1" value="1"
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">End Page</label>
+        <input type="number" id="endPage" min="1" value="1"
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500">
+      </div>
+    </div>
+
+    <!-- Download Type -->
+    <div class="mb-4">
+      <label class="block text-sm font-medium text-gray-700 mb-2">Download Type</label>
+      <select id="downloadType"
+        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500">
+        <option value="images">Images Only (ZIP per page)</option>
+        <option value="pdf">PDF per page</option>
+        <option value="all">All Media (if video exists)</option>
+      </select>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="flex gap-2">
+      <button id="startDownloadBtn"
+        class="flex-1 bg-orange-500 hover:bg-orange-600 text-white py-3 px-4 rounded-lg font-medium">
+        Start Bulk Download
+      </button>
+      <button id="detectPagesBtn" class="bg-blue-500 hover:bg-blue-600 text-white py-3 px-4 rounded-lg font-medium">
+        Auto-Detect Pages
+      </button>
+    </div>
+
+    <!-- Resume Section -->
+    <div id="resumeSection" class="mt-4 p-3 bg-yellow-50 rounded-lg" style="display: none;">
+      <p class="text-sm text-gray-700 mb-2">
+        <strong>⚠️ Unfinished download detected!</strong>
+      </p>
+      <p class="text-xs text-gray-600 mb-3" id="resumeInfo"></p>
+      <div class="flex gap-2">
+        <button id="resumeBtn"
+          class="flex-1 bg-green-500 hover:bg-green-600 text-white py-2 px-3 rounded-lg text-sm font-medium">
+          Resume Download
+        </button>
+        <button id="clearResumeBtn"
+          class="bg-red-500 hover:bg-red-600 text-white py-2 px-3 rounded-lg text-sm font-medium">
+          Clear & Start New
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Progress Overview -->
+  <div id="progressCard" class="bg-white rounded-2xl p-6 border border-gray-200 mb-4" style="display: none;">
+    <div class="flex justify-between items-center mb-4">
+      <div>
+        <h3 class="text-lg font-semibold text-gray-800">Download Progress</h3>
+        <p class="text-sm text-gray-600" id="overallStatus">Preparing...</p>
+      </div>
+      <div class="flex gap-2">
+        <button id="pauseBtn"
+          class="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg text-sm font-medium">
+          Pause
+        </button>
+        <button id="cancelBtn" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium">
+          Cancel
+        </button>
+      </div>
+    </div>
+
+    <!-- Overall Progress Bar -->
+    <div class="mb-4">
+      <div class="flex justify-between items-center text-xs text-gray-600 mb-2">
+        <span id="overallProgressText">0%</span>
+        <span id="overallProgressStatus">0 / 0 pages</span>
+      </div>
+      <div class="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+        <div id="overallProgressBar"
+          class="bg-gradient-to-r from-orange-400 to-orange-600 h-3 rounded-full transition-all duration-300"
+          style="width: 0%">
+        </div>
+      </div>
+    </div>
+
+    <!-- Page List -->
+    <div class="max-h-64 overflow-y-auto space-y-2" id="pageList">
+      <!-- Pages will be dynamically added here -->
+    </div>
+  </div>
+
+  <!-- Warning -->
+  <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+    <p class="text-sm text-yellow-800">
+      <strong>⚠️ Important:</strong> Keep this window open during the download. Downloads will be saved to IndexedDB
+      and can be resumed if interrupted.
+    </p>
+  </div>
+
+  <script src="./scripts/jszip.min.js"></script>
+  <script src="./scripts/FileSaver.min.js"></script>
+  <script src="./scripts/jspdf.umd.min.js"></script>
+  <script src="bulk-download.js"></script>
+</body>
+
+</html>

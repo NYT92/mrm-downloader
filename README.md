@@ -4,7 +4,7 @@ Download bulk images and videos from myreadingmanga.info.
 
 ## Features
 
-- Download bulk images and videos from myreadingmanga.info.
+- Download bulk images and videos from myreadingmanga.info including each pages
 - Download manga/doujin into a ZIP file or PDF file
 - Support downloading videos, GIFs, images in one place into a ZIP format
 - Hide the AI-generated post by default

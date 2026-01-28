@@ -12,6 +12,76 @@ let mrmSettings = {
   hideAIListing: true,
 };
 
+// --- UTILITIES ---
+
+// Utility: Get cookies based on settings
+function getCookiesToUse() {
+  if (mrmSettings.cookieSource === "auto") {
+    return (mrmSettings.autoRetrievedCookies && mrmSettings.autoRetrievedCookies.length > 0)
+      ? mrmSettings.autoRetrievedCookies
+      : [];
+  }
+  return (mrmSettings.cookies && mrmSettings.cookies.length > 0)
+    ? mrmSettings.cookies
+    : [];
+}
+
+// Utility: Get retry count
+function getRetryCount() {
+  return mrmSettings.retryCount || 3;
+}
+
+// Utility: Get timeout value
+function getTimeout() {
+  return (mrmSettings.timeout || 30) * 1000;
+}
+
+// Utility: Update element text content
+function updateStatusText(id, text) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = text;
+}
+
+// Utility: Set element display
+function setElementDisplay(id, display) {
+  const el = document.getElementById(id);
+  if (el) el.style.display = display;
+}
+
+// Utility: Set element width
+function setElementWidth(id, width) {
+  const el = document.getElementById(id);
+  if (el) el.style.width = width;
+}
+
+// Utility: Get file extension from blob
+function getFileExtension(blob, fallback = 'jpg') {
+  if (!blob.type) return fallback;
+  const parts = blob.type.split('/');
+  return parts[1] || fallback;
+}
+
+// Utility: Convert blob to base64
+function blobToBase64(blob) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.readAsDataURL(blob);
+  });
+}
+
+// Utility: Load image from source
+function loadImage(src) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = src;
+  });
+}
+
+// --- CORE ---
+
 document.addEventListener("DOMContentLoaded", async function () {
   await loadDownloadHistory();
   await loadSettings();
@@ -56,77 +126,38 @@ async function loadSettings() {
 }
 
 function getCookieHeaders() {
-  if (!mrmSettings.useCookies) {
-    return {};
-  }
+  if (!mrmSettings.useCookies) return {};
 
-  let cookiesToUse = [];
-
-  if (
-    mrmSettings.cookieSource === "auto" &&
-    mrmSettings.autoRetrievedCookies &&
-    mrmSettings.autoRetrievedCookies.length > 0
-  ) {
-    cookiesToUse = mrmSettings.autoRetrievedCookies;
-  } else if (
-    mrmSettings.cookieSource === "custom" &&
-    mrmSettings.cookies &&
-    mrmSettings.cookies.length > 0
-  ) {
-    cookiesToUse = mrmSettings.cookies;
-  }
-
-  if (cookiesToUse.length === 0) {
-    return {};
-  }
+  const cookiesToUse = getCookiesToUse();
+  if (cookiesToUse.length === 0) return {};
 
   const cookieString = cookiesToUse
     .map((cookie) => `${cookie.name}=${cookie.value}`)
     .join("; ");
 
   if (mrmSettings.debugMode) {
-    console.log(
-      `[MRM Debug] Using ${cookiesToUse.length} cookies (${mrmSettings.cookieSource}):`,
-      cookieString
-    );
+    console.log(`[MRM Debug] Using ${cookiesToUse.length} cookies (${mrmSettings.cookieSource})`);
   }
 
-  return {
-    Cookie: cookieString,
-  };
+  return { Cookie: cookieString };
 }
 
 async function setCookiesInBrowser(url) {
   if (!mrmSettings.useCookies) {
-    console.log(`[MRM Debug] Cookie usage disabled, skipping cookie setting`);
+    if (mrmSettings.debugMode) console.log(`[MRM Debug] Cookie usage disabled`);
     return;
   }
 
-  let cookiesToUse = [];
-
-  if (
-    mrmSettings.cookieSource === "auto" &&
-    mrmSettings.autoRetrievedCookies &&
-    mrmSettings.autoRetrievedCookies.length > 0
-  ) {
-    cookiesToUse = mrmSettings.autoRetrievedCookies;
-  } else if (
-    mrmSettings.cookieSource === "custom" &&
-    mrmSettings.cookies &&
-    mrmSettings.cookies.length > 0
-  ) {
-    cookiesToUse = mrmSettings.cookies;
-  }
-
+  const cookiesToUse = getCookiesToUse();
   if (cookiesToUse.length === 0) {
-    console.log(`[MRM Debug] No cookies to set`);
+    if (mrmSettings.debugMode) console.log(`[MRM Debug] No cookies to set`);
     return;
   }
 
   const urlObj = new URL(url);
-  console.log(
-    `[MRM Debug] Setting ${cookiesToUse.length} cookies for ${urlObj.origin}`
-  );
+  if (mrmSettings.debugMode) {
+    console.log(`[MRM Debug] Setting ${cookiesToUse.length} cookies for ${urlObj.origin}`);
+  }
 
   for (const cookie of cookiesToUse) {
     try {
@@ -185,6 +216,7 @@ async function fetchWithSettings(url, options = {}) {
   await setCookiesInBrowser(url);
 
   const tab = await getActiveTab();
+  const retryCount = getRetryCount();
 
   const pageFetchOptions = {
     method: (options && options.method) || "GET",
@@ -193,12 +225,12 @@ async function fetchWithSettings(url, options = {}) {
     pageFetchOptions.referrer = options.headers.Referer;
   }
 
-  console.log(`[MRM Debug] (Page) Fetching ${url}`);
+  if (mrmSettings.debugMode) console.log(`[MRM Debug] (Page) Fetching ${url}`);
 
   let lastError;
-  for (let attempt = 1; attempt <= mrmSettings.retryCount; attempt++) {
+  for (let attempt = 1; attempt <= retryCount; attempt++) {
     try {
-      console.log(`[MRM Debug] (Page) Fetch attempt ${attempt} for ${url}`);
+      if (mrmSettings.debugMode) console.log(`[MRM Debug] (Page) Fetch attempt ${attempt} for ${url}`);
       const pageResponse = await browser.tabs.sendMessage(tab.id, {
         type: "PAGE_FETCH",
         url,
@@ -210,44 +242,32 @@ async function fetchWithSettings(url, options = {}) {
       if (!pageResponse) throw new Error("No response from page context");
 
       if (!pageResponse.ok) {
-        const statusInfo =
-          typeof pageResponse.status !== "undefined"
-            ? `${pageResponse.status} ${pageResponse.statusText || ""}`
-            : pageResponse.error || "Request failed";
-        throw new Error(`HTTP error: ${statusInfo}`);
+        throw new Error(`HTTP error: ${pageResponse.status || 'Request failed'}`);
       }
 
       const headers = new Headers(pageResponse.headers || []);
-      const contentType =
-        headers.get("content-type") || "application/octet-stream";
+      const contentType = headers.get("content-type") || "application/octet-stream";
       const blob = new Blob([pageResponse.body], { type: contentType });
 
-      const responseLike = {
+      return {
         ok: true,
         status: pageResponse.status,
-        statusText: pageResponse.statusText,
         headers,
         blob: async () => blob,
       };
-
-      return responseLike;
     } catch (error) {
       lastError = error;
-      console.error(
-        `[MRM Debug] (Page) Fetch attempt ${attempt} failed for ${url}:`,
-        error
-      );
-      if (attempt < mrmSettings.retryCount) {
+      console.error(`[MRM Debug] (Page) Fetch attempt ${attempt} failed:`, error.message);
+      if (attempt < retryCount) {
         const waitTime = Math.pow(2, attempt - 1) * 1000;
-        console.log(`[MRM Debug] Waiting ${waitTime}ms before retry...`);
         await new Promise((resolve) => setTimeout(resolve, waitTime));
       }
     }
   }
 
-  console.log(`[MRM Debug] Falling back to extension-context fetch for ${url}`);
+  if (mrmSettings.debugMode) console.log(`[MRM Debug] Falling back to extension-context fetch for ${url}`);
 
-  const defaultHeaders = {
+  const fallbackHeaders = {
     "User-Agent": navigator.userAgent,
     Accept: "image/webp,image/avif,image/*,*/*;q=0.8",
     "Accept-Language": "en-US,en;q=0.5",
@@ -257,41 +277,31 @@ async function fetchWithSettings(url, options = {}) {
     "Sec-Fetch-Dest": "image",
     "Sec-Fetch-Mode": "no-cors",
     "Sec-Fetch-Site": "same-site",
-  };
-
-  const fallbackHeaders = {
-    ...defaultHeaders,
     ...(options.headers || {}),
   };
 
   const fallbackOptions = {
     ...options,
     headers: fallbackHeaders,
-    timeout: mrmSettings.timeout * 1000,
+    timeout: getTimeout(),
     credentials: "include",
     mode: "cors",
   };
 
   let lastFallbackError;
-  for (let attempt = 1; attempt <= mrmSettings.retryCount; attempt++) {
+  for (let attempt = 1; attempt <= retryCount; attempt++) {
     try {
-      console.log(`[MRM Debug] (Ext) Fetch attempt ${attempt} for ${url}`);
+      if (mrmSettings.debugMode) console.log(`[MRM Debug] (Ext) Fetch attempt ${attempt} for ${url}`);
       const res = await fetch(url, fallbackOptions);
-      if (!res.ok) {
-        console.error(
-          `[MRM Debug] (Ext) Response status: ${res.status} ${res.statusText}`
-        );
+      if (!res.ok && mrmSettings.debugMode) {
+        console.error(`[MRM Debug] (Ext) Response status: ${res.status}`);
       }
       return res;
     } catch (err) {
       lastFallbackError = err;
-      console.error(
-        `[MRM Debug] (Ext) Fetch attempt ${attempt} failed for ${url}:`,
-        err
-      );
-      if (attempt < mrmSettings.retryCount) {
+      console.error(`[MRM Debug] (Ext) Fetch attempt ${attempt} failed:`, err.message);
+      if (attempt < retryCount) {
         const waitTime = Math.pow(2, attempt - 1) * 1000;
-        console.log(`[MRM Debug] Waiting ${waitTime}ms before retry...`);
         await new Promise((resolve) => setTimeout(resolve, waitTime));
       }
     }
@@ -348,150 +358,41 @@ async function checkPageContent() {
       .then(getTabsUrl, onError);
 
     const data = await getMRMData();
-    const downloadImagesBtn = document.getElementById("downloadImagesBtn");
-    const downloadAllBtn = document.getElementById("downloadAllBtn");
-    const downloadPdfBtn = document.getElementById("downloadPdfBtn");
-    const downloadVideoBtn = document.getElementById("downloadVideoBtn");
-
     if (tabsUrl.includes("myreadingmanga.info")) {
       // Update page number display
       if (data && data.page) {
-        document.getElementById("pageNumber").textContent = data.page;
+        updateStatusText("pageNumber", data.page);
       }
 
       if (data && data.contentType) {
-        switch (data.contentType) {
-          case "video":
-            downloadVideoBtn.style.display = "block";
-            downloadImagesBtn.style.display = "none";
-            downloadPdfBtn.style.display = "none"; // PDF disabled
-            // Show All button if images also present
-            if (data.images && data.images.length > 0) {
-              downloadAllBtn.style.display = "block";
-            } else {
-              downloadAllBtn.style.display = "none";
-            }
-            document.querySelector("h2").textContent =
-              data.title || "Video Content";
-            document.getElementById("statusText").textContent = "Ready";
-            break;
+        const isVideo = data.contentType === "video";
+        const isImages = data.contentType === "images";
+        const hasImages = data.images && data.images.length > 0;
+        const hasVideo = !!data.video;
 
-          case "images":
-            downloadImagesBtn.style.display = "block";
-            downloadImagesBtn.textContent = "Download Images (ZIP)";
+        setElementDisplay("downloadVideoBtn", (isVideo || hasVideo) ? "block" : "none");
+        setElementDisplay("downloadImagesBtn", (isImages || hasImages) ? "block" : "none");
+        setElementDisplay("downloadPdfBtn", (isImages && hasImages && !hasVideo) ? "block" : "none");
+        setElementDisplay("downloadAllBtn", (hasImages && hasVideo) ? "block" : "none");
 
-            // Enable PDF only when content is images-only
-            if (data.images && data.images.length > 0 && !data.video) {
-              downloadPdfBtn.style.display = "block";
-              const pdfImageCount = document.getElementById("pdfImageCount");
-              if (pdfImageCount) {
-                pdfImageCount.textContent = data.images.length;
-              }
-            } else {
-              downloadPdfBtn.style.display = "none";
-            }
-
-            // Update image count display
-            const imageCount = document.getElementById("imageCount");
-            if (imageCount && data.images) {
-              imageCount.textContent = data.images.length;
-            }
-
-            // Show All button if video also present
-            if (data.video) {
-              downloadAllBtn.style.display = "block";
-            } else {
-              downloadAllBtn.style.display = "none";
-            }
-
-            document.querySelector("h2").textContent =
-              data.title || "Image Content";
-            document.getElementById("statusText").textContent = "Ready";
-            break;
-
-          case "none":
-          default:
-            downloadImagesBtn.style.display = "none";
-            downloadPdfBtn.style.display = "none"; // PDF disabled
-            downloadVideoBtn.style.display = "none";
-            downloadAllBtn.style.display = "none";
-            document.querySelector("h2").textContent =
-              data.title || "No content selected";
-            if (data.reason === "excluded_page") {
-              document.getElementById("statusText").textContent =
-                "Page not supported";
-            } else {
-              document.getElementById("statusText").textContent =
-                "No content found";
-            }
-            break;
+        if (isImages || hasImages) {
+          updateStatusText("downloadImagesBtn", "Download Images (ZIP)");
+          updateStatusText("pdfImageCount", data.images.length);
+          updateStatusText("imageCount", data.images.length);
         }
+
+        updateStatusText("mangaTitle", data.title || "Manga Content");
+        updateStatusText("statusText", (hasImages || hasVideo) ? "Ready" : "No content found");
       } else {
-        // Fallback to old logic if contentType is not available
-        const hasImages = data && data.images && data.images.length > 0;
-        const hasVideo = data && data.video;
-
-        if (hasImages) {
-          downloadImagesBtn.style.display = "block";
-          downloadImagesBtn.textContent = "Download Images (ZIP)";
-          // Enable PDF only when images-only
-          if (!hasVideo) {
-            downloadPdfBtn.style.display = "block";
-            const pdfImageCount = document.getElementById("pdfImageCount");
-            if (pdfImageCount && data.images) {
-              pdfImageCount.textContent = data.images.length;
-            }
-          } else {
-            downloadPdfBtn.style.display = "none";
-          }
-          const imageCount = document.getElementById("imageCount");
-          if (imageCount && data.images) {
-            imageCount.textContent = data.images.length;
-          }
-
-          downloadVideoBtn.style.display = hasVideo ? "block" : "none";
-          // Show All button only if both exist
-          document.getElementById("downloadAllBtn").style.display = hasVideo
-            ? "block"
-            : "none";
-        } else if (hasVideo) {
-          downloadVideoBtn.style.display = "block";
-          downloadImagesBtn.style.display = "none";
-          downloadPdfBtn.style.display = "none"; // PDF disabled
-          document.getElementById("downloadAllBtn").style.display = "none";
-        } else {
-          downloadImagesBtn.style.display = "none";
-          downloadPdfBtn.style.display = "none"; // PDF disabled
-          downloadVideoBtn.style.display = "none";
-          document.getElementById("downloadAllBtn").style.display = "none";
-        }
-
-        // Update title and status
-        if (data && data.title) {
-          document.querySelector("h2").textContent = data.title;
-          document.getElementById("statusText").textContent =
-            hasImages || hasVideo ? "Ready" : "No content found";
-        } else {
-          document.querySelector("h2").textContent = "No content selected";
-          document.getElementById("statusText").textContent =
-            "Navigate to a MyReadingManga page";
-        }
-
-        // Update page number display in fallback
-        if (data && data.page) {
-          document.getElementById("pageNumber").textContent = data.page;
-        }
+        // Fallback or no content
+        ["downloadImagesBtn", "downloadPdfBtn", "downloadVideoBtn", "downloadAllBtn"].forEach(id => setElementDisplay(id, "none"));
+        updateStatusText("mangaTitle", "No content selected");
+        updateStatusText("statusText", "Navigate to a MyReadingManga page");
       }
     } else {
-      console.log("not mrm");
-      // Hide all download buttons when not on MyReadingManga
-      downloadImagesBtn.style.display = "none";
-      downloadPdfBtn.style.display = "none"; // PDF disabled
-      downloadVideoBtn.style.display = "none";
-      downloadAllBtn.style.display = "none";
-      document.querySelector("h2").textContent = "MRM Downloader";
-      document.getElementById("statusText").textContent =
-        "Navigate to MyReadingManga to download content";
+      ["downloadImagesBtn", "downloadPdfBtn", "downloadVideoBtn", "downloadAllBtn"].forEach(id => setElementDisplay(id, "none"));
+      updateStatusText("mangaTitle", "No content selected");
+      updateStatusText("statusText", "Navigate to a MyReadingManga page");
     }
   } catch (error) {
     console.error("[MRM] Error checking page content:", error);
@@ -530,6 +431,10 @@ function setupEventListeners() {
     .getElementById("settingsBtn")
     .addEventListener("click", handleSettingsClick);
 
+  document
+    .getElementById("bulkDownloadBtn")
+    .addEventListener("click", handleBulkDownloadClick);
+
   document.getElementById("historyBtn").addEventListener("click", showHistory);
 
   document.getElementById("backToMainBtn").addEventListener("click", showMain);
@@ -547,17 +452,25 @@ function setupEventListeners() {
 
 function showHistory() {
   currentView = "history";
-  document.getElementById("mainContent").style.display = "none";
-  document.getElementById("historyContent").style.display = "block";
+  setElementDisplay("mainContent", "none");
+  setElementDisplay("historyContent", "block");
   renderHistory();
 }
 
 function showMain() {
   currentView = "main";
-  document.getElementById("mainContent").style.display = "block";
-  document.getElementById("historyContent").style.display = "none";
+  setElementDisplay("mainContent", "block");
+  setElementDisplay("historyContent", "none");
 }
 
+function updateUI() {
+  ["mainView", "historyView", "settingsView"].forEach(id => {
+    setElementDisplay(id, currentView === id.replace("View", "") ? "block" : "none");
+  });
+
+  if (currentView === "history") renderHistory();
+  if (currentView === "settings") renderSettings();
+}
 function renderHistory() {
   const historyList = document.getElementById("historyList");
   const emptyHistory = document.getElementById("emptyHistory");
@@ -583,28 +496,25 @@ function renderHistory() {
         item.status === "completed"
           ? "text-green-600"
           : item.status === "failed"
-          ? "text-red-600"
-          : "text-yellow-600";
+            ? "text-red-600"
+            : "text-yellow-600";
 
       return `
       <div class="history-item flex items-center justify-between p-3 border border-gray-200 rounded-lg">
         <div class="flex items-center space-x-3 flex-1">
           <span class="text-xl">${typeIcon}</span>
           <div class="flex-1 min-w-0">
-            <p class="text-sm font-medium text-gray-900 break-words overflow-hidden line-clamp-2 max-w-full">${
-              item.title
-            }</p>
+            <p class="text-sm font-medium text-gray-900 break-words overflow-hidden line-clamp-2 max-w-full">${item.title
+        }</p>
             <p class="text-xs text-gray-500">${date} at ${time}</p>
-            <span class="text-xs ${statusColor} font-medium">${
-        item.status === "completed"
+            <span class="text-xs ${statusColor} font-medium">${item.status === "completed"
           ? "✅"
           : item.status === "failed"
-          ? "❌"
-          : "⬇️"
-      }</span>
-            <button class="open-url-btn text-blue-600 hover:text-blue-800 text-sm" data-url="${
-              item.url
-            }">Open</button>
+            ? "❌"
+            : "⬇️"
+        }</span>
+            <button class="open-url-btn text-blue-600 hover:text-blue-800 text-sm" data-url="${item.url
+        }">Open</button>
           </div>
         </div>
       </div>
@@ -650,26 +560,23 @@ async function clearHistory() {
 }
 
 function setDownloadButtonState(isDisabled, text) {
-  const downloadImagesBtn = document.getElementById("downloadImagesBtn");
-  const downloadBtn = document.getElementById("downloadBtn");
-  const downloadAllBtn = document.getElementById("downloadAllBtn");
+  const buttons = ["downloadImagesBtn", "downloadBtn", "downloadAllBtn", "downloadPdfBtn"];
+  buttons.forEach(id => {
+    const btn = document.getElementById(id);
+    if (!btn) return;
+    btn.disabled = isDisabled;
 
-  if (downloadImagesBtn) {
-    downloadImagesBtn.disabled = isDisabled;
-    if (text) downloadImagesBtn.textContent = text;
-  }
-
-  if (downloadBtn) {
-    downloadBtn.disabled = isDisabled;
-    if (text) downloadBtn.textContent = text;
-  }
-
-  if (downloadAllBtn) {
-    downloadAllBtn.disabled = isDisabled;
-    if (text && document.activeElement === downloadAllBtn) {
-      downloadAllBtn.querySelector("#allButtonText").textContent = text;
+    // Handle special text scenarios
+    if (text) {
+      if (id === "downloadAllBtn") {
+        updateStatusText("allButtonText", text);
+      } else if (id === "downloadPdfBtn") {
+        updateStatusText("pdfButtonText", text);
+      } else {
+        btn.textContent = text;
+      }
     }
-  }
+  });
 }
 
 async function handlePdfDownloadClick() {
@@ -677,7 +584,7 @@ async function handlePdfDownloadClick() {
     const data = await getMRMData();
     if (!data) {
       alert("No content found on this page.");
-      setPdfButtonState(false);
+      setDownloadButtonState(false);
       return;
     }
 
@@ -685,11 +592,11 @@ async function handlePdfDownloadClick() {
       await downloadPdf(data.images, data.title, data.page);
     } else {
       alert("No images found to generate PDF.");
-      setPdfButtonState(false, "Generate PDF");
+      setDownloadButtonState(false, "Generate PDF");
     }
   } catch (error) {
     console.error("[MRM] PDF download error:", error);
-    setPdfButtonState(false, "Generate PDF");
+    setDownloadButtonState(false, "Generate PDF");
     alert("Failed to generate PDF. Check console for details.");
   }
 }
@@ -801,39 +708,45 @@ function handleDeleteClick() {
   }
 }
 
+function handleBulkDownloadClick() {
+  window.location.href = "bulk-download.html";
+}
+
 function handleSettingsClick() {
   window.location.href = "settings.html";
 }
 
 function setProgress(percent, text) {
-  const progressBar = document.getElementById("progressBar");
-  const downloadCard = document.getElementById("downloadCard");
-  const downloadStatus = document.getElementById("downloadStatus");
-  const downloadTitle = document.getElementById("downloadTitle");
-
   if (percent > 0 && percent < 100) {
-    downloadCard.style.display = "block";
+    setElementDisplay("downloadCard", "block");
   } else if (percent === 100) {
     setTimeout(() => {
-      downloadCard.style.display = "none";
+      setElementDisplay("downloadCard", "none");
     }, 1500);
   } else {
-    downloadCard.style.display = "none";
+    setElementDisplay("downloadCard", "none");
   }
 
-  progressBar.style.width = percent + "%";
+  setElementWidth("progressBar", percent + "%");
+
+  // Update percentage text
+  updateStatusText("progressText", Math.round(percent) + "%");
+
   if (text) {
-    downloadStatus.textContent = text;
+    updateStatusText("downloadStatus", text);
+    updateStatusText("progressStatus", text);
     if (currentDownload) {
-      downloadTitle.textContent = `Downloading ${currentDownload.type}...`;
+      updateStatusText("downloadTitle", `Downloading ${currentDownload.type}...`);
     }
   }
 
-  console.log(`[MRM] Progress: ${percent}% - ${text}`);
+  if (mrmSettings.debugMode) {
+    console.log(`[MRM] Progress: ${percent}% - ${text}`);
+  }
 }
 
 function updateStatus(status) {
-  document.getElementById("statusText").textContent = status;
+  updateStatusText("statusText", status);
 }
 
 function updateUI() {
@@ -875,15 +788,15 @@ async function downloadImages(images, title, page = "1") {
             Referer: tab.url,
           },
         });
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
+        if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
+
         const blob = await response.blob();
-        const ext = blob.type.split("/")[1] || "jpg";
+        const ext = getFileExtension(blob);
         zip.file(`image_${i + 1}.${ext}`, blob, { binary: true });
-        console.log(
-          `[MRM] Downloaded image ${i + 1}/${images.length}: ${images[i]}`
-        );
+
+        if (mrmSettings.debugMode) {
+          console.log(`[MRM] Downloaded image ${i + 1}/${images.length}`);
+        }
       } catch (e) {
         console.error("[MRM] Error downloading image", images[i], e);
         if (mrmSettings.debugMode) {
@@ -900,8 +813,8 @@ async function downloadImages(images, title, page = "1") {
 
     setProgress(100, "Saving file...");
 
-    const safeTitle = title.replace(/[^a-z0-9]/gi, "_").toLowerCase();
-    const filename = `${safeTitle}_p${page}_images.zip`;
+    // const safeTitle = title.replace(/[^a-z0-9]/gi, "_").toLowerCase();
+    const filename = `${title} - Page ${page}.zip`;
 
     saveAs(content, filename);
 
@@ -945,10 +858,21 @@ async function downloadVideo(videoUrl, title) {
   const tab = await getActiveTab();
   currentDownload = { type: "video", title, url: tab.url };
   updateStatus("Downloading video...");
-  setProgress(10, "Fetching video...");
+
+  // Start with immediate visual feedback
+  setProgress(5, "Initializing download...");
   setDownloadButtonState(true, "Downloading...");
 
   try {
+    // Simulate progress during fetch to show activity
+    let progressInterval = setInterval(() => {
+      const progressBar = document.getElementById("progressBar");
+      const currentProgress = progressBar ? parseInt(progressBar.style.width) || 5 : 5;
+      if (currentProgress < 45) {
+        setProgress(currentProgress + 2, "Fetching video...");
+      }
+    }, 300);
+
     // Add referrer header for video requests
     const response = await fetchWithSettings(videoUrl, {
       headers: {
@@ -956,18 +880,53 @@ async function downloadVideo(videoUrl, title) {
       },
     });
 
+    clearInterval(progressInterval);
+
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
 
     setProgress(50, "Processing video...");
-    const blob = await response.blob();
+
+    // Try to get content length for better progress tracking
+    const contentLength = response.headers?.get?.('content-length');
+    let blob;
+
+    if (contentLength && response.body && typeof response.body.getReader === 'function') {
+      // Stream the response with progress tracking
+      const total = parseInt(contentLength, 10);
+      let loaded = 0;
+      const reader = response.body.getReader();
+      const chunks = [];
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        chunks.push(value);
+        loaded += value.length;
+
+        // Progress from 50% to 85% based on download progress
+        const downloadProgress = 50 + Math.floor((loaded / total) * 35);
+        setProgress(downloadProgress, `Downloading video... ${Math.floor((loaded / total) * 100)}%`);
+      }
+
+      // Combine chunks into blob
+      const contentType = response.headers?.get?.('content-type') || 'video/mp4';
+      blob = new Blob(chunks, { type: contentType });
+    } else {
+      // Fallback: show incremental progress during blob conversion
+      setProgress(60, "Processing video data...");
+      await new Promise(resolve => setTimeout(resolve, 100));
+      setProgress(75, "Almost done...");
+      blob = await response.blob();
+    }
 
     setProgress(90, "Saving video...");
 
-    const safeTitle = title.replace(/[^a-z0-9]/gi, "_").toLowerCase();
-    const ext = videoUrl.split(".").pop() || "mp4";
-    const filename = `${safeTitle}_video.${ext}`;
+    // const safeTitle = title.replace(/[^a-z0-9]/gi, "_").toLowerCase();
+    const ext = getFileExtension(blob, "mp4");
+    const filename = `${title}.${ext}`;
 
     saveAs(blob, filename);
 
@@ -1036,11 +995,10 @@ async function downloadAllMedia({ images, videoUrl, title, page = "1" }) {
           const response = await fetchWithSettings(images[i], {
             headers: { Referer: tab.url },
           });
-          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
           const blob = await response.blob();
-          const mime = blob.type || "image/jpeg";
-          const subtype = mime.split("/")[1] || "jpg";
-          zip.file(`images/image_${i + 1}.${subtype}`, blob, { binary: true });
+          const ext = getFileExtension(blob);
+          zip.file(`images/image_${i + 1}.${ext}`, blob, { binary: true });
         } catch (e) {
           console.error("[MRM] Error downloading image", images[i], e);
         }
@@ -1142,23 +1100,11 @@ async function downloadPdf(images, title, page = "1") {
             Referer: tab.url,
           },
         });
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
+        if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
+
         const blob = await response.blob();
-
-        const base64 = await new Promise((resolve) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result);
-          reader.readAsDataURL(blob);
-        });
-
-        const img = new Image();
-        img.src = base64;
-
-        await new Promise((resolve) => {
-          img.onload = resolve;
-        });
+        const base64 = await blobToBase64(blob);
+        const img = await loadImage(base64);
 
         // Initialize PDF on first image with page size matching image resolution (no borders)
         const orientation = img.width > img.height ? "l" : "p";
@@ -1169,15 +1115,13 @@ async function downloadPdf(images, title, page = "1") {
         }
 
         // Choose image format based on mime (default to JPEG)
-        let imgFormat = "JPEG";
-        try {
-          const mime = (base64.split(",")[0] || "").toLowerCase();
-          if (mime.includes("png")) imgFormat = "PNG";
-        } catch (_) {}
+        const imgFormat = base64.toLowerCase().includes("png") ? "PNG" : "JPEG";
 
         pdf.addImage(base64, imgFormat, 0, 0, img.width, img.height);
 
-        console.log(`[MRM] Added image ${i + 1}/${images.length} to PDF`);
+        if (mrmSettings.debugMode) {
+          console.log(`[MRM] Added image ${i + 1}/${images.length} to PDF`);
+        }
       } catch (e) {
         console.error("[MRM] Error processing image for PDF", images[i], e);
         if (mrmSettings.debugMode) {
@@ -1223,17 +1167,5 @@ async function downloadPdf(images, title, page = "1") {
     currentDownload = null;
     setPdfButtonState(false, "Generate PDF");
     alert("PDF generation failed. Check console for details.");
-  }
-}
-
-function setPdfButtonState(isDisabled, text) {
-  const downloadPdfBtn = document.getElementById("downloadPdfBtn");
-
-  if (downloadPdfBtn) {
-    downloadPdfBtn.disabled = isDisabled;
-    if (text) {
-      const buttonText = document.getElementById("pdfButtonText");
-      if (buttonText) buttonText.textContent = text;
-    }
   }
 }

@@ -4,6 +4,14 @@
 (function () {
   "use strict";
 
+  const imageSelectors = [
+    ".img-myreadingmanga",
+    ".img-myreadingmanga img",
+    ".entry-content img",
+    ".separator img",
+    "img[decoding='async']",
+  ];
+
   const excludedPaths = [
     "/about/",
     "/upload/",
@@ -30,39 +38,10 @@
   const includedPaths = ["/tag/ai-generate/"];
 
   const currentPath = window.location.pathname;
-  
-  if (includedPaths.some((path) => currentPath.startsWith(path))) {
-    const aiListing = document.querySelectorAll("article.tag-ai-generate");
 
-    if (!aiListing.length) return;
-
-    for (const element of aiListing) {
-      element.addEventListener("click", (event) => {
-        if (
-          confirm(
-            "Are you sure you want to view generated AI images instead of people hard work?"
-          )
-        ) {
-          element.style.filter = "none";
-          element.style.opacity = "1";
-        } else {
-          event.preventDefault();
-        }
-      });
-      element.style.filter = "blur(10px)";
-      element.style.opacity = "0.5";
-    }
-  }
   if (excludedPaths.some((path) => currentPath.startsWith(path))) return;
 
   function getImageSources() {
-    const imageSelectors = [
-      ".img-myreadingmanga",
-      ".img-myreadingmanga img",
-      ".entry-content img",
-      ".separator img",
-      "img[decoding='async']",
-    ];
     let imageSources = [];
     for (const selector of imageSelectors) {
       const images = document.querySelectorAll(selector);
@@ -77,14 +56,6 @@
   }
 
   function checkHasImages() {
-    const imageSelectors = [
-      ".img-myreadingmanga",
-      ".img-myreadingmanga img",
-      ".entry-content img",
-      ".separator img",
-      "img[decoding='async']",
-    ];
-
     let hasImages = false;
     for (const selector of imageSelectors) {
       if (document.querySelectorAll(selector).length > 0) {
@@ -132,7 +103,6 @@
       return { type: "none", reason: "excluded_page" };
     }
 
-    // Apply the same content detection logic as userscript
     if (checkVidinTag.includes("video") && hasVideo) {
       return { type: "video", hasContent: true };
     } else if (!checkVidinTag.includes("video") && hasImages) {
@@ -142,7 +112,7 @@
     }
   }
 
-  // Listen for messages from popup
+  // This is the only effective method of bypassing CORS and CF check for absolutely no reason but who knews...
   function ensurePageFetchBridge() {
     if (document.getElementById("mrm-page-fetch-bridge")) return;
     const script = document.createElement("script");
@@ -246,7 +216,7 @@
       const result = await browser.storage.local.get(["mrmSettings"]);
       const settings = result.mrmSettings || {};
       const isEnabled = settings.hideAIListing !== false;
-      
+
       if (isEnabled) {
         if (document.readyState === "loading") {
           document.addEventListener("DOMContentLoaded", hideAIListing);
@@ -263,6 +233,7 @@
       }
     }
   }
+
   initHideAIListing();
 
   browser.runtime.onMessage.addListener((message) => {
@@ -278,6 +249,40 @@
         hasContent: contentType.hasContent || false,
         supportsPdf: contentType.supportsPdf || false,
         reason: contentType.reason,
+      });
+    }
+
+    if (message && message.type === "DETECT_PAGINATION") {
+      // Detect the last page number from pagination
+      const paginationLinks = document.querySelectorAll('.page-numbers');
+      let lastPage = 1;
+
+      paginationLinks.forEach(link => {
+        const pageNum = parseInt(link.textContent.trim());
+        if (!isNaN(pageNum) && pageNum > lastPage) {
+          lastPage = pageNum;
+        }
+      });
+
+      // Also check for "next" link to see if there are more pages
+      const nextLink = document.querySelector('.page-numbers.next');
+      if (nextLink) {
+        // If there's a next link, try to extract the page number from it
+        const href = nextLink.getAttribute('href');
+        if (href) {
+          const match = href.match(/\/page\/(\d+)\//);
+          if (match) {
+            const nextPage = parseInt(match[1]);
+            if (nextPage > lastPage) {
+              lastPage = nextPage;
+            }
+          }
+        }
+      }
+
+      return Promise.resolve({
+        lastPage: lastPage,
+        currentPage: getCurrentPage()
       });
     }
 

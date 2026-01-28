@@ -118,23 +118,27 @@ const cleanup = (details) => {
 };
 browser.webRequest.onCompleted.addListener(
   cleanup,
-  { urls: [
+  {
+    urls: [
       "https://i1.myreadingmanga.info/*",
       "https://i2.myreadingmanga.info/*",
       "https://i3.myreadingmanga.info/*",
       "https://i4.myreadingmanga.info/*",
       "https://i5.myreadingmanga.info/*",
       "https://i6.myreadingmanga.info/*",
-    ] }
+    ]
+  }
 );
 browser.webRequest.onErrorOccurred.addListener(
   cleanup,
-  { urls: [
+  {
+    urls: [
       "https://i1.myreadingmanga.info/*",
       "https://i2.myreadingmanga.info/*",
       "https://i3.myreadingmanga.info/*",
       "https://i4.myreadingmanga.info/*",
       "https://i5.myreadingmanga.info/*",
       "https://i6.myreadingmanga.info/*",
-    ] }
+    ]
+  }
 );
