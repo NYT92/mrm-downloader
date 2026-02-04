@@ -36,13 +36,28 @@ jobs:
         run: |
           web-ext sign --channel=unlisted --api-key="$AMO_API_KEY" --api-secret="$AMO_API_SECRET" --source-dir=firefox
         
-      - name: Rename extension file
+      - name: List and rename extension file
         run: |
-          cd firefox/web-ext-artifacts
-          # Find the generated .xpi file and rename it with version
-          XPIFILE=$(ls *.xpi | head -n 1)
-          mv "$XPIFILE" "mrm-downloader-${{ steps.get_version.outputs.version }}-firefox.xpi"
-          echo "Created: mrm-downloader-${{ steps.get_version.outputs.version }}-firefox.xpi"
+          echo "Listing files in firefox/web-ext-artifacts:"
+          ls -la firefox/web-ext-artifacts/ || echo "Directory not found"
+          
+          # Find the signed .xpi file
+          if [ -d "firefox/web-ext-artifacts" ]; then
+            cd firefox/web-ext-artifacts
+            XPIFILE=$(ls *.xpi 2>/dev/null | head -n 1)
+            
+            if [ -n "$XPIFILE" ]; then
+              echo "Found file: $XPIFILE"
+              mv "$XPIFILE" "mrm-downloader-${{ steps.get_version.outputs.version }}-firefox.xpi"
+              echo "Renamed to: mrm-downloader-${{ steps.get_version.outputs.version }}-firefox.xpi"
+            else
+              echo "Error: No .xpi file found in web-ext-artifacts"
+              exit 1
+            fi
+          else
+            echo "Error: web-ext-artifacts directory not found"
+            exit 1
+          fi
       
       - name: Create Release
         id: create_release
