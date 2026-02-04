@@ -34,11 +34,7 @@ jobs:
           AMO_API_KEY: ${{ secrets.AMO_API_KEY }}
           AMO_API_SECRET: ${{ secrets.AMO_API_SECRET }}
         run: |
-          web-ext sign \
-            --channel=unlisted \
-            --api-key="$AMO_API_KEY" \
-            --api-secret="$AMO_API_SECRET" \
-            --source-dir=firefox
+          web-ext sign --channel=unlisted --api-key="$AMO_API_KEY" --api-secret="$AMO_API_SECRET" --source-dir=firefox
         
       - name: Rename extension file
         run: |
