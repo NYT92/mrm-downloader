@@ -39,7 +39,12 @@
 
   const currentPath = window.location.pathname;
 
-  if (excludedPaths.some((path) => currentPath.startsWith(path))) return;
+  // Check if path should be included despite being in excluded paths
+  const isIncluded = includedPaths.some((path) => currentPath.startsWith(path));
+  const isExcluded = excludedPaths.some((path) => currentPath.startsWith(path));
+
+  // Early return only if excluded AND not in included paths
+  const shouldExclude = isExcluded && !isIncluded;
 
   function getImageSources() {
     let imageSources = [];
@@ -95,11 +100,7 @@
     const isHomePage = document.querySelector(".content-archive") !== null;
     const hasImages = checkHasImages();
 
-    if (
-      excludedPaths.some((path) => currentPath.startsWith(path)) ||
-      hasYouTube ||
-      isHomePage
-    ) {
+    if (shouldExclude || hasYouTube || isHomePage) {
       return { type: "none", reason: "excluded_page" };
     }
 
@@ -234,7 +235,11 @@
     }
   }
 
+  // Initialize AI listing hiding on all pages (including tag pages)
   initHideAIListing();
+
+  // Only set up download-related message listeners if not excluded
+  if (shouldExclude) return;
 
   browser.runtime.onMessage.addListener((message) => {
     if (message && message.type === "GET_MRM_DATA") {

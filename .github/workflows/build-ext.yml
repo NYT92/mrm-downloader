@@ -1,0 +1,85 @@
+name: Build Firefox Extension
+
+on:
+  push:
+    tags:
+      - 'v*'  # Triggers on version tags like v1.0.0, v1.3.1, etc.
+  workflow_dispatch:  # Allows manual triggering from GitHub UI
+
+jobs:
+  build-firefox:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Install web-ext
+        run: npm install -g web-ext
+      
+      - name: Get version from manifest
+        id: get_version
+        run: |
+          VERSION=$(jq -r '.version' firefox/manifest.json)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Extension version: $VERSION"
+      
+      - name: Build Firefox extension
+        run: |
+          cd firefox
+          web-ext build --overwrite-dest
+        
+      - name: Rename extension file
+        run: |
+          cd firefox/web-ext-artifacts
+          # Find the generated .zip file and rename it to .xpi with version
+          ZIPFILE=$(ls *.zip | head -n 1)
+          mv "$ZIPFILE" "mrm-downloader-${{ steps.get_version.outputs.version }}-firefox.xpi"
+          echo "Created: mrm-downloader-${{ steps.get_version.outputs.version }}-firefox.xpi"
+      
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref_name }}
+          release_name: Release ${{ github.ref_name }}
+          body: |
+            ## MRM Downloader v${{ steps.get_version.outputs.version }}
+            
+            ### Firefox Extension
+            Download the `.xpi` file below and install it in Firefox.
+            
+            ### Installation
+            1. Download the `.xpi` file
+            2. Open Firefox and go to `about:addons`
+            3. Click the gear icon and select "Install Add-on From File..."
+            4. Select the downloaded `.xpi` file
+            
+            ### Changes
+            See the commit history for details.
+          draft: false
+          prerelease: false
+      
+      - name: Upload Firefox Extension to Release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./firefox/web-ext-artifacts/mrm-downloader-${{ steps.get_version.outputs.version }}-firefox.xpi
+          asset_name: mrm-downloader-${{ steps.get_version.outputs.version }}-firefox.xpi
+          asset_content_type: application/x-xpinstall
+      
+      - name: Upload artifact for download
+        uses: actions/upload-artifact@v4
+        with:
+          name: firefox-extension
+          path: ./firefox/web-ext-artifacts/*.xpi
+          retention-days: 30
