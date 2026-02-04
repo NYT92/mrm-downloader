@@ -1,4 +1,3 @@
-$schema:
 name: Build Firefox Extension
 
 on:
