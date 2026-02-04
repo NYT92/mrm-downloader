@@ -1,3 +1,4 @@
+$schema:
 name: Build Firefox Extension
 
 on:
@@ -29,17 +30,23 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Extension version: $VERSION"
       
-      - name: Build Firefox extension
+      - name: Sign Firefox extension
+        env:
+          AMO_API_KEY: ${{ secrets.AMO_API_KEY }}
+          AMO_API_SECRET: ${{ secrets.AMO_API_SECRET }}
         run: |
-          cd firefox
-          web-ext build --overwrite-dest
+          web-ext sign \
+            --channel=unlisted \
+            --api-key="$AMO_API_KEY" \
+            --api-secret="$AMO_API_SECRET" \
+            --source-dir=firefox
         
       - name: Rename extension file
         run: |
           cd firefox/web-ext-artifacts
-          # Find the generated .zip file and rename it to .xpi with version
-          ZIPFILE=$(ls *.zip | head -n 1)
-          mv "$ZIPFILE" "mrm-downloader-${{ steps.get_version.outputs.version }}-firefox.xpi"
+          # Find the generated .xpi file and rename it with version
+          XPIFILE=$(ls *.xpi | head -n 1)
+          mv "$XPIFILE" "mrm-downloader-${{ steps.get_version.outputs.version }}-firefox.xpi"
           echo "Created: mrm-downloader-${{ steps.get_version.outputs.version }}-firefox.xpi"
       
       - name: Create Release
