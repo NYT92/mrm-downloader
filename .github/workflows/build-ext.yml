@@ -38,12 +38,12 @@ jobs:
         
       - name: List and rename extension file
         run: |
-          echo "Listing files in firefox/web-ext-artifacts:"
-          ls -la firefox/web-ext-artifacts/ || echo "Directory not found"
+          echo "Listing files in web-ext-artifacts:"
+          ls -la web-ext-artifacts || echo "Directory not found"
           
           # Find the signed .xpi file
-          if [ -d "firefox/web-ext-artifacts" ]; then
-            cd firefox/web-ext-artifacts
+          if [ -d "web-ext-artifacts" ]; then
+            cd web-ext-artifacts
             XPIFILE=$(ls *.xpi 2>/dev/null | head -n 1)
             
             if [ -n "$XPIFILE" ]; then
