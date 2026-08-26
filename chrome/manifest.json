@@ -7,6 +7,7 @@
   "permissions": [
     "storage",
     "downloads",
+    "cookies",
     "scripting",
     "tabs",
     "declarativeNetRequest"
@@ -43,10 +44,7 @@
     {
       "matches": ["https://myreadingmanga.info/*"],
       "js": [
-        "./scripts/jszip.min.js",
-        "./scripts/FileSaver.min.js",
-        "content.js",
-        "./scripts/tailwindcss-3.4.16.js"
+        "content.js"
       ]
     }
   ],
@@ -57,8 +55,7 @@
     {
       "resources": [
         "./scripts/jszip.min.js",
-        "./scripts/FileSaver.min.js",
-        "./scripts/tailwindcss-3.4.16.js"
+        "./scripts/FileSaver.min.js"
       ],
       "matches": ["<all_urls>"]
     }

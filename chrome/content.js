@@ -1,8 +1,13 @@
-// MRM Downloader Chrome Extension Content Script
-// Reference: https://github.com/NYT92/mrm-downloader/raw/refs/heads/main/mrm.user.js
-
 (function () {
   "use strict";
+
+  const imageSelectors = [
+    ".img-myreadingmanga",
+    ".img-myreadingmanga img",
+    ".entry-content img",
+    ".separator img",
+    "img[decoding='async']",
+  ];
 
   const excludedPaths = [
     "/about/",
@@ -30,39 +35,11 @@
   const includedPaths = ["/tag/ai-generate/"];
 
   const currentPath = window.location.pathname;
-  
-  if (includedPaths.some((path) => currentPath.startsWith(path))) {
-    const aiListing = document.querySelectorAll("article.tag-ai-generate");
-
-    if (!aiListing.length) return;
-
-    for (const element of aiListing) {
-      element.addEventListener("click", (event) => {
-        if (
-          confirm(
-            "Are you sure you want to view generated AI images instead of people hard work?"
-          )
-        ) {
-          element.style.filter = "none";
-          element.style.opacity = "1";
-        } else {
-          event.preventDefault();
-        }
-      });
-      element.style.filter = "blur(10px)";
-      element.style.opacity = "0.5";
-    }
-  }
-  if (excludedPaths.some((path) => currentPath.startsWith(path))) return;
+  const isIncluded = includedPaths.some((path) => currentPath.startsWith(path));
+  const isExcluded = excludedPaths.some((path) => currentPath.startsWith(path));
+  const shouldExclude = isExcluded && !isIncluded;
 
   function getImageSources() {
-    const imageSelectors = [
-      ".img-myreadingmanga",
-      ".img-myreadingmanga img",
-      ".entry-content img",
-      ".separator img",
-      "img[decoding='async']",
-    ];
     let imageSources = [];
     for (const selector of imageSelectors) {
       const images = document.querySelectorAll(selector);
@@ -77,22 +54,10 @@
   }
 
   function checkHasImages() {
-    const imageSelectors = [
-      ".img-myreadingmanga",
-      ".img-myreadingmanga img",
-      ".entry-content img",
-      ".separator img",
-      "img[decoding='async']",
-    ];
-
-    let hasImages = false;
     for (const selector of imageSelectors) {
-      if (document.querySelectorAll(selector).length > 0) {
-        hasImages = true;
-        break;
-      }
+      if (document.querySelectorAll(selector).length > 0) return true;
     }
-    return hasImages;
+    return false;
   }
 
   function getVideoSource() {
@@ -109,7 +74,7 @@
   }
 
   function getCurrentPage() {
-    const pageElement = document.querySelector(".post-page-numbers.current");
+    const pageElement = document.querySelector(".page-numbers.current");
     return pageElement ? pageElement.textContent.trim() : "1";
   }
 
@@ -124,31 +89,23 @@
     const isHomePage = document.querySelector(".content-archive") !== null;
     const hasImages = checkHasImages();
 
-    if (
-      excludedPaths.some((path) => currentPath.startsWith(path)) ||
-      hasYouTube ||
-      isHomePage
-    ) {
+    if (shouldExclude || hasYouTube || isHomePage) {
       return { type: "none", reason: "excluded_page" };
     }
 
-    // Apply the same content detection logic as userscript
     if (checkVidinTag.includes("video") && hasVideo) {
       return { type: "video", hasContent: true };
     } else if (!checkVidinTag.includes("video") && hasImages) {
-      return { type: "images", hasContent: true };
+      return { type: "images", hasContent: true, supportsPdf: true };
     } else {
       return { type: "none", reason: "no_content" };
     }
   }
 
-  // Listen for messages from popup
   function ensurePageFetchBridge() {
     return new Promise((resolve) => {
-      // Ask background service worker to install the bridge in MAIN world
       try {
         chrome.runtime.sendMessage({ type: "INSTALL_PAGE_FETCH_BRIDGE" }, () => {
-          // Ignore errors; resolve regardless to proceed
           resolve();
         });
       } catch (_) {
@@ -157,60 +114,179 @@
     });
   }
 
+  function hideAIListing() {
+    const aiListing = document.querySelectorAll(".tag-ai-generate");
+    if (!aiListing.length) return;
+
+    for (const element of aiListing) {
+      element.addEventListener("click", (event) => {
+        if (confirm("Are you sure you want to view generated AI images instead of people hard work?")) {
+          element.style.filter = "none";
+          element.style.opacity = "1";
+        } else {
+          event.preventDefault();
+        }
+      });
+      element.style.filter = "blur(10px)";
+      element.style.opacity = "0.5";
+    }
+  }
+
+  async function initHideAIListing() {
+    try {
+      const result = await chrome.storage.local.get(["mrmSettings"]);
+      const settings = result.mrmSettings || {};
+      const isEnabled = settings.hideAIListing !== false;
+
+      if (isEnabled) {
+        if (document.readyState === "loading") {
+          document.addEventListener("DOMContentLoaded", hideAIListing);
+        } else {
+          hideAIListing();
+        }
+      }
+    } catch (error) {
+      console.error("[MRM] Error loading settings:", error);
+      if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", hideAIListing);
+      } else {
+        hideAIListing();
+      }
+    }
+  }
+
+  function styleBookmarks() {
+    if (document.getElementById("mrm-bookmark-styles")) return;
+    const style = document.createElement("style");
+    style.id = "mrm-bookmark-styles";
+    style.textContent = `
+      #bottom.bookmark { margin: 24px 0; text-align: center; }
+      .upb_add_remove_links { display: flex; justify-content: center; gap: 8px; }
+      .upb_bookmark_control { display: inline-flex; align-items: center; gap: 6px; padding: 8px 18px; border-radius: 8px; font-size: 14px; font-weight: 500; text-decoration: none !important; transition: all 0.2s ease; }
+      .upb_add_bookmark { background: #f97316; color: #fff !important; border: 1px solid #ea580c; }
+      .upb_add_bookmark:hover { background: #ea580c !important; color: #fff; }
+      .upb_del_bookmark { background: #fff; color: #dc2626 !important; border: 1px solid #fca5a5; }
+      .upb_del_bookmark:hover { background: #fef2f2; color: #b91c1c !important; border-color: #f87171; }
+    `;
+    document.head.appendChild(style);
+  }
+
+  function dupBookmarkToTop() {
+    if (document.getElementById("mrm-bookmark-top")) return;
+    const entryHeader = document.querySelector(".entry-header");
+    const bottomBookmark = document.querySelector("#bottom.bookmark");
+    if (!entryHeader || !bottomBookmark) return;
+
+    const topBookmark = bottomBookmark.cloneNode(true);
+    topBookmark.id = "mrm-bookmark-top";
+    topBookmark.style.marginTop = "0";
+    topBookmark.style.marginBottom = "12px";
+    entryHeader.parentNode.insertBefore(topBookmark, entryHeader);
+  }
+
+  function initBookmarkDup() {
+    styleBookmarks();
+    dupBookmarkToTop();
+    const observer = new MutationObserver(() => dupBookmarkToTop());
+    observer.observe(document.body, { childList: true, subtree: true });
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", () => {
+      initBookmarkDup();
+      initHideAIListing();
+    });
+  } else {
+    initBookmarkDup();
+    initHideAIListing();
+  }
+
+  if (shouldExclude) return;
+
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message && message.type === "GET_MRM_DATA") {
       const contentType = determineContentType();
 
-      sendResponse({
+      return Promise.resolve({
         images: getImageSources(),
         video: getVideoSource(),
         title: getTitle(),
         page: getCurrentPage(),
         contentType: contentType.type,
         hasContent: contentType.hasContent || false,
+        supportsPdf: contentType.supportsPdf || false,
         reason: contentType.reason,
       });
-      return false;
+    }
+
+    if (message && message.type === "DETECT_PAGINATION") {
+      const paginationLinks = document.querySelectorAll(".page-numbers");
+      let lastPage = 1;
+
+      paginationLinks.forEach((link) => {
+        const pageNum = parseInt(link.textContent.trim());
+        if (!isNaN(pageNum) && pageNum > lastPage) {
+          lastPage = pageNum;
+        }
+      });
+
+      const nextLink = document.querySelector(".page-numbers.next");
+      if (nextLink) {
+        const href = nextLink.getAttribute("href");
+        if (href) {
+          const match = href.match(/\/page\/(\d+)\//);
+          if (match) {
+            const nextPage = parseInt(match[1]);
+            if (nextPage > lastPage) {
+              lastPage = nextPage;
+            }
+          }
+        }
+      }
+
+      return Promise.resolve({
+        lastPage: lastPage,
+        currentPage: getCurrentPage(),
+      });
     }
 
     if (message && message.type === "PAGE_FETCH") {
-      // Ensure bridge is installed via background (avoids inline script injection blocked by CSP)
       ensurePageFetchBridge().then(() => {
-      const requestId = `mrm_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+        const requestId = `mrm_${Date.now()}_${Math.random().toString(36).slice(2)}`;
 
-      function handleMessage(event) {
-        const data = event.data;
-        if (!data || data.source !== "mrm-page" || data.type !== "MRM_PAGE_FETCH_RESPONSE") return;
-        if (data.requestId !== requestId) return;
-        window.removeEventListener("message", handleMessage, false);
+        function handleMessage(event) {
+          const data = event.data;
+          if (!data || data.source !== "mrm-page" || data.type !== "MRM_PAGE_FETCH_RESPONSE") return;
+          if (data.requestId !== requestId) return;
+          window.removeEventListener("message", handleMessage, false);
           clearTimeout(timeoutId);
-        sendResponse({
-          ok: !!data.ok,
-          status: data.status,
-          statusText: data.statusText,
-          headers: data.headers,
-          body: data.body,
-          responseType: data.responseType,
-          error: data.error || null,
-        });
-      }
+          sendResponse({
+            ok: !!data.ok,
+            status: data.status,
+            statusText: data.statusText,
+            headers: data.headers,
+            body: data.body,
+            responseType: data.responseType,
+            error: data.error || null,
+          });
+        }
 
-      window.addEventListener("message", handleMessage, false);
+        window.addEventListener("message", handleMessage, false);
         const timeoutId = setTimeout(() => {
           try { window.removeEventListener("message", handleMessage, false); } catch (_) {}
           try { sendResponse({ ok: false, error: "PAGE_FETCH_TIMEOUT" }); } catch (_) {}
         }, 8000);
         window.postMessage({
-        source: "mrm-extension",
-        type: "MRM_PAGE_FETCH_REQUEST",
-        requestId,
-        url: message.url,
-        options: message.options || { method: "GET" },
-        wantBody: !!message.wantBody,
+          source: "mrm-extension",
+          type: "MRM_PAGE_FETCH_REQUEST",
+          requestId,
+          url: message.url,
+          options: message.options || { method: "GET" },
+          wantBody: !!message.wantBody,
           responseType: message.responseType || "bytes",
-      }, "*");
+        }, "*");
       });
-      return true; // keep the channel open for async sendResponse
+      return true;
     }
   });
-})(); 
+})();

@@ -84,6 +84,8 @@
     );
   }
 
+  console.log(getTitle());
+
   function getCurrentPage() {
     const pageElement = document.querySelector(".page-numbers.current");
     return pageElement ? pageElement.textContent.trim() : "1";
@@ -91,7 +93,7 @@
 
   function determineContentType() {
     const checkVidinTag = Array.from(
-      document.querySelectorAll(".entry-categories a")
+      document.querySelectorAll(".entry-categories a"),
     ).map((tag) => tag.textContent.trim().toLowerCase());
 
     const hasVideo = document.querySelector("#MRM_video") !== null;
@@ -198,7 +200,7 @@
       element.addEventListener("click", (event) => {
         if (
           confirm(
-            "Are you sure you want to view generated AI images instead of people hard work?"
+            "Are you sure you want to view generated AI images instead of people hard work & creativity? You can still view it at least but think about it...",
           )
         ) {
           element.style.filter = "none";
@@ -235,10 +237,83 @@
     }
   }
 
-  // Initialize AI listing hiding on all pages (including tag pages)
-  initHideAIListing();
+  function styleBookmarks() {
+    if (document.getElementById("mrm-bookmark-styles")) return;
+    const style = document.createElement("style");
+    style.id = "mrm-bookmark-styles";
+    style.textContent = `
+      #bottom.bookmark {
+        margin: 24px 0;
+        text-align: center;
+      }
+      .upb_add_remove_links {
+        display: flex;
+        justify-content: center;
+        gap: 8px;
+      }
+      .upb_bookmark_control {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 18px;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 500;
+        text-decoration: none !important;
+        transition: all 0.2s ease;
+      }
+      .upb_add_bookmark {
+        background: #f97316;
+        color: #fff !important;
+        border: 1px solid #ea580c;
+      }
+      .upb_add_bookmark:hover {
+        background: #ea580c !important;
+        color: #fff;
+      }
+      .upb_del_bookmark {
+        background: #fff;
+        color: #dc2626 !important;
+        border: 1px solid #fca5a5;
+      }
+      .upb_del_bookmark:hover {
+        background: #fef2f2;
+        color: #b91c1c !important;
+        border-color: #f87171;
+      }
+    `;
+    document.head.appendChild(style);
+  }
 
-  // Only set up download-related message listeners if not excluded
+  function dupBookmarkToTop() {
+    if (document.getElementById("mrm-bookmark-top")) return;
+    const entryHeader = document.querySelector(".entry-header");
+    const bottomBookmark = document.querySelector("#bottom.bookmark");
+    if (!entryHeader || !bottomBookmark) return;
+
+    const topBookmark = bottomBookmark.cloneNode(true);
+    topBookmark.id = "mrm-bookmark-top";
+    topBookmark.style.marginTop = "0";
+    topBookmark.style.marginBottom = "12px";
+    entryHeader.parentNode.insertBefore(topBookmark, entryHeader);
+  }
+
+  function initBookmarkDup() {
+    styleBookmarks();
+    dupBookmarkToTop();
+    const observer = new MutationObserver(() => {
+      dupBookmarkToTop();
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initBookmarkDup);
+  } else {
+    initBookmarkDup();
+    initHideAIListing();
+  }
+
   if (shouldExclude) return;
 
   browser.runtime.onMessage.addListener((message) => {
@@ -259,10 +334,10 @@
 
     if (message && message.type === "DETECT_PAGINATION") {
       // Detect the last page number from pagination
-      const paginationLinks = document.querySelectorAll('.page-numbers');
+      const paginationLinks = document.querySelectorAll(".page-numbers");
       let lastPage = 1;
 
-      paginationLinks.forEach(link => {
+      paginationLinks.forEach((link) => {
         const pageNum = parseInt(link.textContent.trim());
         if (!isNaN(pageNum) && pageNum > lastPage) {
           lastPage = pageNum;
@@ -270,10 +345,10 @@
       });
 
       // Also check for "next" link to see if there are more pages
-      const nextLink = document.querySelector('.page-numbers.next');
+      const nextLink = document.querySelector(".page-numbers.next");
       if (nextLink) {
         // If there's a next link, try to extract the page number from it
-        const href = nextLink.getAttribute('href');
+        const href = nextLink.getAttribute("href");
         if (href) {
           const match = href.match(/\/page\/(\d+)\//);
           if (match) {
@@ -287,7 +362,7 @@
 
       return Promise.resolve({
         lastPage: lastPage,
-        currentPage: getCurrentPage()
+        currentPage: getCurrentPage(),
       });
     }
 
@@ -335,7 +410,7 @@
             wantBody: !!message.wantBody,
             responseType: message.responseType || "arraybuffer",
           },
-          "*"
+          "*",
         );
       });
     }
